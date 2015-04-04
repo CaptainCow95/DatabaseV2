@@ -1,0 +1,6 @@
+language: csharp
+solution: DatabaseV2.sln
+install:
+ - nuget restore DatabaseV2.sln
+script:
+ - xbuild /p:Configuration=Release DatabaseV2.sln
