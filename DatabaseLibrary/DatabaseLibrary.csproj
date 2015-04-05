@@ -4,16 +4,15 @@
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
     <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
-    <ProjectGuid>{E7C25BA8-3FE7-4291-97DD-C1C4EFC99AE4}</ProjectGuid>
-    <OutputType>Exe</OutputType>
+    <ProjectGuid>{DED835D0-242E-4651-9094-24D1548D49B9}</ProjectGuid>
+    <OutputType>Library</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>DatabaseV2</RootNamespace>
-    <AssemblyName>DatabaseV2</AssemblyName>
+    <RootNamespace>DatabaseLibrary</RootNamespace>
+    <AssemblyName>DatabaseLibrary</AssemblyName>
     <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugSymbols>true</DebugSymbols>
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
@@ -23,7 +22,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
-    <PlatformTarget>AnyCPU</PlatformTarget>
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
@@ -33,6 +31,9 @@
     <StyleCopTreatErrorsAsWarnings>false</StyleCopTreatErrorsAsWarnings>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="SmartThreadPool">
+      <HintPath>..\SmartThreadPool.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -42,17 +43,18 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Program.cs" />
+    <Compile Include="ByteArrayHelper.cs" />
+    <Compile Include="Networking\ConnectionStatus.cs" />
+    <Compile Include="Networking\ConnectionType.cs" />
+    <Compile Include="Networking\Message.cs" />
+    <Compile Include="Networking\Messaging\JoinRequest.cs" />
+    <Compile Include="Networking\Messaging\JoinResult.cs" />
+    <Compile Include="Networking\Messaging\MessageData.cs" />
+    <Compile Include="Networking\MessageStatus.cs" />
+    <Compile Include="Networking\Network.cs" />
+    <Compile Include="Networking\Connection.cs" />
+    <Compile Include="Networking\NodeDefinition.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DatabaseLibrary\DatabaseLibrary.csproj">
-      <Project>{ded835d0-242e-4651-9094-24d1548d49b9}</Project>
-      <Name>DatabaseLibrary</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\StyleCop.targets" />
