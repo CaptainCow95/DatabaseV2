@@ -17,7 +17,7 @@
         /// </summary>
         /// <param name="data">The data to decode.</param>
         /// <param name="index">The index in the data.</param>
-        public JoinResult(byte[] data, int index)
+        internal JoinResult(byte[] data, int index)
         {
         }
 

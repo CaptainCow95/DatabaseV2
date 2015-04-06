@@ -15,18 +15,15 @@ namespace DatabaseV2
         /// <param name="args">The arguments to the program.</param>
         private static void Main(string[] args)
         {
-            Network network = new Network(int.Parse(args[0]));
-            network.Connect(new NodeDefinition("localhost", int.Parse(args[1])));
+            ChordNetwork network = new ChordNetwork(int.Parse(args[0]), new NodeDefinition("localhost", int.Parse(args[1])));
 
             while (true)
             {
                 Thread.Sleep(1000);
                 Console.Clear();
-                Console.WriteLine("Connected Nodes:");
-                foreach (var node in network.GetConnectedNodes())
-                {
-                    Console.WriteLine(node.ConnectionName);
-                }
+                Console.WriteLine("Running on port " + int.Parse(args[0]));
+                Console.WriteLine("Printing Chord Status:");
+                network.PrintStatus();
             }
         }
     }

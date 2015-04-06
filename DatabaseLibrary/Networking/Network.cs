@@ -12,8 +12,23 @@ namespace DatabaseLibrary.Networking
     /// <summary>
     /// Handles network connections.
     /// </summary>
-    public class Network
+    public abstract class Network
     {
+        /// <summary>
+        /// The connection cleaner thread.
+        /// </summary>
+        private readonly Thread _cleanerThread;
+
+        /// <summary>
+        /// The incoming connection.
+        /// </summary>
+        private readonly Dictionary<NodeDefinition, Connection> _incomingConnections = new Dictionary<NodeDefinition, Connection>();
+
+        /// <summary>
+        /// The incoming connections lock object.
+        /// </summary>
+        private readonly ReaderWriterLockSlim _incomingConnectionsLock = new ReaderWriterLockSlim();
+
         /// <summary>
         /// The incoming connection listener.
         /// </summary>
@@ -25,9 +40,34 @@ namespace DatabaseLibrary.Networking
         private readonly SmartThreadPool _messageReceivedPool = new SmartThreadPool(SmartThreadPool.DefaultIdleTimeout, 10, 5);
 
         /// <summary>
+        /// The thread that receives messages.
+        /// </summary>
+        private readonly Thread _messageReceivingThread;
+
+        /// <summary>
         /// The thread pool used to send messages.
         /// </summary>
         private readonly SmartThreadPool _messageSendPool = new SmartThreadPool(SmartThreadPool.DefaultIdleTimeout, 10, 5);
+
+        /// <summary>
+        /// The data received so far for incoming messages.
+        /// </summary>
+        private readonly Dictionary<Tuple<NodeDefinition, ConnectionType>, List<byte>> _messagesReceived = new Dictionary<Tuple<NodeDefinition, ConnectionType>, List<byte>>();
+
+        /// <summary>
+        /// The outgoing connections.
+        /// </summary>
+        private readonly Dictionary<NodeDefinition, Connection> _outgoingConnections = new Dictionary<NodeDefinition, Connection>();
+
+        /// <summary>
+        /// The outgoing connections lock object.
+        /// </summary>
+        private readonly ReaderWriterLockSlim _outgoingConnectionsLock = new ReaderWriterLockSlim();
+
+        /// <summary>
+        /// The port to listen for connections on.
+        /// </summary>
+        private readonly int _port;
 
         /// <summary>
         /// The messages waiting for responses.
@@ -35,45 +75,10 @@ namespace DatabaseLibrary.Networking
         private readonly Dictionary<uint, Message> _waitingForResponses = new Dictionary<uint, Message>();
 
         /// <summary>
-        /// The incoming connection.
-        /// </summary>
-        private Dictionary<NodeDefinition, Connection> _incomingConnections = new Dictionary<NodeDefinition, Connection>();
-
-        /// <summary>
-        /// The incoming connections lock object.
-        /// </summary>
-        private ReaderWriterLockSlim _incomingConnectionsLock = new ReaderWriterLockSlim();
-
-        /// <summary>
-        /// The thread that receives messages.
-        /// </summary>
-        private Thread _messageReceivingThread;
-
-        /// <summary>
-        /// The data received so far for incoming messages.
-        /// </summary>
-        private Dictionary<Tuple<NodeDefinition, ConnectionType>, List<byte>> _messagesReceived = new Dictionary<Tuple<NodeDefinition, ConnectionType>, List<byte>>();
-
-        /// <summary>
-        /// The outgoing connections.
-        /// </summary>
-        private Dictionary<NodeDefinition, Connection> _outgoingConnections = new Dictionary<NodeDefinition, Connection>();
-
-        /// <summary>
-        /// The outgoing connections lock object.
-        /// </summary>
-        private ReaderWriterLockSlim _outgoingConnectionsLock = new ReaderWriterLockSlim();
-
-        /// <summary>
-        /// The port to listen for connections on.
-        /// </summary>
-        private int _port;
-
-        /// <summary>
         /// Initializes a new instance of the <see cref="Network"/> class.
         /// </summary>
         /// <param name="port">The port to listen for connections on.</param>
-        public Network(int port)
+        protected Network(int port)
         {
             _port = port;
 
@@ -83,30 +88,20 @@ namespace DatabaseLibrary.Networking
             _messageReceivingThread = new Thread(ReceiveMessages);
             _messageReceivingThread.Start();
 
+            _cleanerThread = new Thread(CleanConnections);
+            _cleanerThread.Start();
+
             _listener = new TcpListener(IPAddress.Any, port);
             _listener.Start();
             _listener.BeginAcceptTcpClient(ProcessRequest, null);
         }
 
         /// <summary>
-        /// Connects to the specified node.
+        /// Gets the port to listen for connections on.
         /// </summary>
-        /// <param name="definition">The node to connect to.</param>
-        public void Connect(NodeDefinition definition)
+        protected int Port
         {
-            Message message = new Message(definition, new JoinRequest(_port), true)
-            {
-                RequireSecureConnection = false
-            };
-
-            SendMessage(message);
-            message.BlockUntilDone();
-            if (message.Success)
-            {
-                _outgoingConnectionsLock.EnterReadLock();
-                _outgoingConnections[definition].ConnectionEstablished();
-                _outgoingConnectionsLock.ExitReadLock();
-            }
+            get { return _port; }
         }
 
         /// <summary>
@@ -119,10 +114,99 @@ namespace DatabaseLibrary.Networking
         }
 
         /// <summary>
+        /// Connects to the specified node.
+        /// </summary>
+        /// <param name="definition">The node to connect to.</param>
+        /// <returns>True if the connection was established, otherwise false.</returns>
+        protected bool Connect(NodeDefinition definition)
+        {
+            _outgoingConnectionsLock.EnterReadLock();
+            if (_outgoingConnections.ContainsKey(definition) && _outgoingConnections[definition].Status != ConnectionStatus.Disconnected)
+            {
+                _outgoingConnectionsLock.ExitReadLock();
+                return true;
+            }
+
+            _outgoingConnectionsLock.ExitReadLock();
+            var message = new Message(definition, new JoinRequest(_port), true)
+            {
+                RequireSecureConnection = false
+            };
+
+            SendMessage(message);
+            message.BlockUntilDone();
+            if (!message.Success)
+            {
+                return false;
+            }
+
+            _outgoingConnectionsLock.EnterReadLock();
+            _outgoingConnections[definition].ConnectionEstablished();
+            _outgoingConnectionsLock.ExitReadLock();
+            return true;
+        }
+
+        /// <summary>
+        /// Called when a node is disconnected.
+        /// </summary>
+        /// <param name="node">The node that got disconnected.</param>
+        protected abstract void Disconnection(NodeDefinition node);
+
+        /// <summary>
+        /// Handles a message.
+        /// </summary>
+        /// <param name="message">The message that was received.</param>
+        protected abstract void HandleMessage(Message message);
+
+        /// <summary>
+        /// Sends a message.
+        /// </summary>
+        /// <param name="message">The message to send.</param>
+        /// <remarks>Queues the sending function onto the thread pool.</remarks>
+        protected void SendMessage(Message message)
+        {
+            message.Status = MessageStatus.Sending;
+            _messageSendPool.QueueWorkItem(SendMessageWorkItem, message);
+        }
+
+        /// <summary>
+        /// Cleans up and disconnected connections.
+        /// </summary>
+        private void CleanConnections()
+        {
+            List<NodeDefinition> removedConnections = new List<NodeDefinition>();
+            while (true)
+            {
+                Thread.Sleep(5000);
+
+                lock (_messagesReceived)
+                {
+                    _outgoingConnectionsLock.EnterWriteLock();
+                    removedConnections.Clear();
+                    removedConnections.AddRange(_outgoingConnections.Where(e => e.Value.Status == ConnectionStatus.Disconnected).Select(e => e.Key));
+                    removedConnections.ForEach(e => _outgoingConnections.Remove(e));
+                    _outgoingConnectionsLock.ExitWriteLock();
+
+                    removedConnections.ForEach(e => _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(e, ConnectionType.Outgoing)));
+                    removedConnections.ForEach(Disconnection);
+
+                    _incomingConnectionsLock.EnterWriteLock();
+                    removedConnections.Clear();
+                    removedConnections.AddRange(_incomingConnections.Where(e => e.Value.Status == ConnectionStatus.Disconnected).Select(e => e.Key));
+                    removedConnections.ForEach(e => _incomingConnections.Remove(e));
+                    _incomingConnectionsLock.ExitWriteLock();
+
+                    removedConnections.ForEach(e => _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(e, ConnectionType.Incoming)));
+                    removedConnections.ForEach(Disconnection);
+                }
+            }
+        }
+
+        /// <summary>
         /// Handles processing a completed message.
         /// </summary>
         /// <param name="message">The message to process.</param>
-        public void MessageReceivedHandler(Message message)
+        private void MessageReceivedHandler(Message message)
         {
             if (message.Data is JoinRequest)
             {
@@ -130,7 +214,7 @@ namespace DatabaseLibrary.Networking
                 RenameConnection(message.Address, request.Address);
                 _incomingConnectionsLock.EnterReadLock();
                 _incomingConnections[request.Address].ConnectionEstablished();
-                _outgoingConnectionsLock.ExitReadLock();
+                _incomingConnectionsLock.ExitReadLock();
                 Message response = new Message(message, new JoinResult(), false)
                 {
                     Address = request.Address
@@ -138,12 +222,69 @@ namespace DatabaseLibrary.Networking
 
                 SendMessage(response);
             }
+            else
+            {
+                HandleMessage(message);
+            }
+        }
+
+        /// <summary>
+        /// Processes a message.
+        /// </summary>
+        /// <param name="address">The address the message came from.</param>
+        /// <param name="type">The type of connection the message came from.</param>
+        /// <param name="data">The data of the message.</param>
+        private void ProcessMessage(NodeDefinition address, ConnectionType type, byte[] data)
+        {
+            Message message = new Message(address, data, type);
+
+            if (message.InResponseTo != 0)
+            {
+                lock (_waitingForResponses)
+                {
+                    if (_waitingForResponses.ContainsKey(message.InResponseTo))
+                    {
+                        Message waiting = _waitingForResponses[message.InResponseTo];
+                        waiting.Response = message;
+                        waiting.Status = MessageStatus.ResponseReceived;
+                        if (waiting.ResponseCallback != null)
+                        {
+                            _messageReceivedPool.QueueWorkItem(waiting.ResponseCallback, waiting);
+                        }
+
+                        _waitingForResponses.Remove(message.InResponseTo);
+                    }
+                }
+            }
+            else
+            {
+                _messageReceivedPool.QueueWorkItem(MessageReceivedHandler, message);
+            }
+        }
+
+        /// <summary>
+        /// Processes an incoming connection request.
+        /// </summary>
+        /// <param name="result">The result of the async call.</param>
+        private void ProcessRequest(IAsyncResult result)
+        {
+            var incoming = _listener.EndAcceptTcpClient(result);
+            _listener.BeginAcceptTcpClient(ProcessRequest, null);
+
+            Connection connection = new Connection(incoming, ConnectionType.Incoming);
+
+            _incomingConnectionsLock.EnterWriteLock();
+
+            NodeDefinition def = new NodeDefinition(((IPEndPoint)incoming.Client.RemoteEndPoint).Address.ToString(), ((IPEndPoint)incoming.Client.RemoteEndPoint).Port);
+            _incomingConnections.Add(def, connection);
+
+            _incomingConnectionsLock.ExitWriteLock();
         }
 
         /// <summary>
         /// Scans the active connections for new messages.
         /// </summary>
-        public void ReceiveMessages()
+        private void ReceiveMessages()
         {
             var messageBuffer = new byte[1024];
             while (true)
@@ -245,59 +386,6 @@ namespace DatabaseLibrary.Networking
         }
 
         /// <summary>
-        /// Processes a message.
-        /// </summary>
-        /// <param name="address">The address the message came from.</param>
-        /// <param name="type">The type of connection the message came from.</param>
-        /// <param name="data">The data of the message.</param>
-        private void ProcessMessage(NodeDefinition address, ConnectionType type, byte[] data)
-        {
-            Message message = new Message(address, data, type);
-
-            if (message.InResponseTo != 0)
-            {
-                lock (_waitingForResponses)
-                {
-                    if (_waitingForResponses.ContainsKey(message.InResponseTo))
-                    {
-                        Message waiting = _waitingForResponses[message.InResponseTo];
-                        waiting.Reponse = message;
-                        waiting.Status = MessageStatus.ResponseReceived;
-                        if (waiting.ResponseCallback != null)
-                        {
-                            _messageReceivedPool.QueueWorkItem(waiting.ResponseCallback, waiting);
-                        }
-
-                        _waitingForResponses.Remove(message.InResponseTo);
-                    }
-                }
-            }
-            else
-            {
-                _messageReceivedPool.QueueWorkItem(MessageReceivedHandler, message);
-            }
-        }
-
-        /// <summary>
-        /// Processes an incoming connection request.
-        /// </summary>
-        /// <param name="result">The result of the async call.</param>
-        private void ProcessRequest(IAsyncResult result)
-        {
-            var incoming = _listener.EndAcceptTcpClient(result);
-            _listener.BeginAcceptTcpClient(ProcessRequest, null);
-
-            Connection connection = new Connection(incoming, ConnectionType.Incoming);
-
-            _incomingConnectionsLock.EnterWriteLock();
-
-            NodeDefinition def = new NodeDefinition(((IPEndPoint)incoming.Client.RemoteEndPoint).Address.ToString(), ((IPEndPoint)incoming.Client.RemoteEndPoint).Port);
-            _incomingConnections.Add(def, connection);
-
-            _incomingConnectionsLock.ExitWriteLock();
-        }
-
-        /// <summary>
         /// Renames a connection once the name is known.
         /// </summary>
         /// <param name="currentName">The current name of the connection.</param>
@@ -341,17 +429,6 @@ namespace DatabaseLibrary.Networking
 
                 _incomingConnectionsLock.ExitWriteLock();
             }
-        }
-
-        /// <summary>
-        /// Sends a message.
-        /// </summary>
-        /// <param name="message">The message to send.</param>
-        /// <remarks>Queues the sending function onto the thread pool.</remarks>
-        private void SendMessage(Message message)
-        {
-            message.Status = MessageStatus.Sending;
-            _messageSendPool.QueueWorkItem(SendMessageWorkItem, message);
         }
 
         /// <summary>

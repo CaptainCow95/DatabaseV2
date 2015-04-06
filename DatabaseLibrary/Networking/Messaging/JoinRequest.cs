@@ -1,6 +1,4 @@
-﻿using System.Net;
-
-namespace DatabaseLibrary.Networking.Messaging
+﻿namespace DatabaseLibrary.Networking.Messaging
 {
     /// <summary>
     /// Represents a request to join a network.
@@ -13,7 +11,7 @@ namespace DatabaseLibrary.Networking.Messaging
         /// <param name="port">The port the node is running on.</param>
         public JoinRequest(int port)
         {
-            Address = new NodeDefinition(Dns.GetHostName(), port);
+            Address = new NodeDefinition("localhost", port);
         }
 
         /// <summary>
@@ -21,7 +19,7 @@ namespace DatabaseLibrary.Networking.Messaging
         /// </summary>
         /// <param name="data">The data to decode.</param>
         /// <param name="index">The index in the data.</param>
-        public JoinRequest(byte[] data, int index)
+        internal JoinRequest(byte[] data, int index)
         {
             Address = new NodeDefinition(ByteArrayHelper.ToString(data, ref index), ByteArrayHelper.ToInt32(data, ref index));
         }

@@ -123,14 +123,6 @@ namespace DatabaseLibrary.Networking
         }
 
         /// <summary>
-        /// Gets the ID of the message.
-        /// </summary>
-        public uint ID
-        {
-            get { return _id; }
-        }
-
-        /// <summary>
         /// Gets the message ID the message is in response to.
         /// </summary>
         public uint InResponseTo
@@ -141,16 +133,7 @@ namespace DatabaseLibrary.Networking
         /// <summary>
         /// Gets or sets the response to the message.
         /// </summary>
-        public Message Reponse { get; set; }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether an already identified connection to send the message.
-        /// </summary>
-        public bool RequireSecureConnection
-        {
-            get { return _requireSecureConnection; }
-            set { _requireSecureConnection = value; }
-        }
+        public Message Response { get; set; }
 
         /// <summary>
         /// Gets or sets the function to call when a response is received.
@@ -176,6 +159,23 @@ namespace DatabaseLibrary.Networking
         public bool WaitingForResponse
         {
             get { return _waitingForResponse; }
+        }
+
+        /// <summary>
+        /// Gets the ID of the message.
+        /// </summary>
+        internal uint ID
+        {
+            get { return _id; }
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether an already identified connection to send the message.
+        /// </summary>
+        internal bool RequireSecureConnection
+        {
+            get { return _requireSecureConnection; }
+            set { _requireSecureConnection = value; }
         }
 
         /// <summary>

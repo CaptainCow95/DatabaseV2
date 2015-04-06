@@ -43,9 +43,15 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ByteArrayHelper.cs" />
+    <Compile Include="Networking\ChordNetwork.cs" />
     <Compile Include="Networking\ConnectionStatus.cs" />
     <Compile Include="Networking\ConnectionType.cs" />
     <Compile Include="Networking\Message.cs" />
+    <Compile Include="Networking\Messaging\ChordNotify.cs" />
+    <Compile Include="Networking\Messaging\ChordPredecessorRequest.cs" />
+    <Compile Include="Networking\Messaging\ChordPredecessorResponse.cs" />
+    <Compile Include="Networking\Messaging\ChordSuccessorRequest.cs" />
+    <Compile Include="Networking\Messaging\ChordSuccessorResponse.cs" />
     <Compile Include="Networking\Messaging\JoinRequest.cs" />
     <Compile Include="Networking\Messaging\JoinResult.cs" />
     <Compile Include="Networking\Messaging\MessageData.cs" />

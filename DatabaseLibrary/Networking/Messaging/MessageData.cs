@@ -20,7 +20,32 @@ namespace DatabaseLibrary.Networking.Messaging
             /// <summary>
             /// Represents a <see cref="JoinResult"/>.
             /// </summary>
-            JoinResult
+            JoinResult,
+
+            /// <summary>
+            /// Represents a <see cref="ChordSuccessorRequest"/>.
+            /// </summary>
+            ChordSuccessorRequest,
+
+            /// <summary>
+            /// Represents a <see cref="ChordSuccessorResponse"/>.
+            /// </summary>
+            ChordSuccessorResponse,
+
+            /// <summary>
+            /// Represents a <see cref="ChordPredecessorRequest"/>.
+            /// </summary>
+            ChordPredecessorRequest,
+
+            /// <summary>
+            /// Represents a <see cref="ChordPredecessorResponse"/>.
+            /// </summary>
+            ChordPredecessorResponse,
+
+            /// <summary>
+            /// Represents a <see cref="ChordNotify"/>.
+            /// </summary>
+            ChordNotify
         }
 
         /// <summary>
@@ -39,6 +64,21 @@ namespace DatabaseLibrary.Networking.Messaging
 
                 case MessageType.JoinResult:
                     return new JoinResult(data, index);
+
+                case MessageType.ChordSuccessorRequest:
+                    return new ChordSuccessorRequest();
+
+                case MessageType.ChordSuccessorResponse:
+                    return new ChordSuccessorResponse(data, index);
+
+                case MessageType.ChordPredecessorRequest:
+                    return new ChordPredecessorRequest();
+
+                case MessageType.ChordPredecessorResponse:
+                    return new ChordPredecessorResponse(data, index);
+
+                case MessageType.ChordNotify:
+                    return new ChordNotify(data, index);
 
                 default:
                     throw new Exception("Unidentified message type!");
