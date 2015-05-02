@@ -1,9 +1,9 @@
-﻿namespace DatabaseLibrary.Networking
+﻿namespace DatabaseV2.Networking
 {
     /// <summary>
     /// Represents the type of the connection.
     /// </summary>
-    internal enum ConnectionType
+    public enum ConnectionType
     {
         /// <summary>
         /// Represents an outgoing connection.

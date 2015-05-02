@@ -1,19 +1,19 @@
-﻿namespace DatabaseLibrary.Networking.Messaging
+﻿namespace DatabaseV2.Networking.Messaging
 {
     /// <summary>
     /// Represents a notify message.
     /// </summary>
-    internal class ChordNotify : MessageData
+    public class ChordNotify : MessageData
     {
         /// <summary>
         /// The chord ID of the node.
         /// </summary>
-        private uint _chordId;
+        private readonly uint _chordId;
 
         /// <summary>
         /// The node sending the notify.
         /// </summary>
-        private NodeDefinition _node;
+        private readonly NodeDefinition _node;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ChordNotify"/> class.
@@ -31,7 +31,7 @@
         /// </summary>
         /// <param name="data">The data to decode.</param>
         /// <param name="index">The index in the data.</param>
-        internal ChordNotify(byte[] data, int index)
+        public ChordNotify(byte[] data, int index)
         {
             _node = new NodeDefinition(ByteArrayHelper.ToString(data, ref index), ByteArrayHelper.ToInt32(data, ref index));
             _chordId = ByteArrayHelper.ToUInt32(data, ref index);
@@ -40,7 +40,7 @@
         /// <summary>
         /// Gets the chord ID of the node.
         /// </summary>
-        public uint ChordID
+        public uint ChordId
         {
             get { return _chordId; }
         }
@@ -60,7 +60,7 @@
         }
 
         /// <inheritdoc />
-        protected override MessageData.MessageType GetMessageTypeId()
+        protected override MessageType GetMessageTypeId()
         {
             return MessageType.ChordNotify;
         }

@@ -32,6 +32,10 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="SmartThreadPool, Version=2.2.3.0, Culture=neutral, PublicKeyToken=1126fe8b671e8a79, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\SmartThreadPool.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Xml.Linq" />
@@ -41,20 +45,30 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="ByteArrayHelper.cs" />
     <Compile Include="DatabaseNode.cs" />
-    <Compile Include="Node.cs" />
+    <Compile Include="Networking\ChordNetwork.cs" />
+    <Compile Include="Networking\Connection.cs" />
+    <Compile Include="Networking\ConnectionStatus.cs" />
+    <Compile Include="Networking\ConnectionType.cs" />
+    <Compile Include="Networking\Message.cs" />
+    <Compile Include="Networking\MessageStatus.cs" />
+    <Compile Include="Networking\Messaging\ChordNotify.cs" />
+    <Compile Include="Networking\Messaging\ChordPredecessorRequest.cs" />
+    <Compile Include="Networking\Messaging\ChordPredecessorResponse.cs" />
+    <Compile Include="Networking\Messaging\ChordSuccessorRequest.cs" />
+    <Compile Include="Networking\Messaging\ChordSuccessorResponse.cs" />
+    <Compile Include="Networking\Messaging\JoinRequest.cs" />
+    <Compile Include="Networking\Messaging\JoinResult.cs" />
+    <Compile Include="Networking\Messaging\MessageData.cs" />
+    <Compile Include="Networking\Network.cs" />
+    <Compile Include="Networking\NodeDefinition.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Settings.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
-  </ItemGroup>
-  <ItemGroup>
-    <ProjectReference Include="..\DatabaseLibrary\DatabaseLibrary.csproj">
-      <Project>{ded835d0-242e-4651-9094-24d1548d49b9}</Project>
-      <Name>DatabaseLibrary</Name>
-    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 

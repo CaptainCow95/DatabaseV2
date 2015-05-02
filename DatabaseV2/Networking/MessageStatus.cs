@@ -1,4 +1,4 @@
-﻿namespace DatabaseLibrary.Networking
+﻿namespace DatabaseV2.Networking
 {
     /// <summary>
     /// Represents the status of a message.

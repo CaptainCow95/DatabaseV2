@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Text;
 
-namespace DatabaseLibrary
+namespace DatabaseV2
 {
     /// <summary>
     /// A class to help with byte array operations.

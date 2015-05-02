@@ -1,9 +1,9 @@
-﻿namespace DatabaseLibrary.Networking
+﻿namespace DatabaseV2.Networking
 {
     /// <summary>
     /// Represents the status of a connection.
     /// </summary>
-    internal enum ConnectionStatus
+    public enum ConnectionStatus
     {
         /// <summary>
         /// The connection is active.

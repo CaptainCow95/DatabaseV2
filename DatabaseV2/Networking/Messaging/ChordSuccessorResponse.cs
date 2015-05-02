@@ -1,9 +1,9 @@
-﻿namespace DatabaseLibrary.Networking.Messaging
+﻿namespace DatabaseV2.Networking.Messaging
 {
     /// <summary>
     /// Represents a response to a <see cref="ChordSuccessorRequest"/>.
     /// </summary>
-    internal class ChordSuccessorResponse : MessageData
+    public class ChordSuccessorResponse : MessageData
     {
         /// <summary>
         /// The chord ID of the node.
@@ -31,7 +31,7 @@
         /// </summary>
         /// <param name="data">The data to decode.</param>
         /// <param name="index">The index in the data.</param>
-        internal ChordSuccessorResponse(byte[] data, int index)
+        public ChordSuccessorResponse(byte[] data, int index)
         {
             _successor = new NodeDefinition(ByteArrayHelper.ToString(data, ref index), ByteArrayHelper.ToInt32(data, ref index));
             _chordId = ByteArrayHelper.ToUInt32(data, ref index);
@@ -40,7 +40,7 @@
         /// <summary>
         /// Gets the chord ID of the node.
         /// </summary>
-        public uint ChordID
+        public uint ChordId
         {
             get { return _chordId; }
         }
@@ -60,7 +60,7 @@
         }
 
         /// <inheritdoc />
-        protected override MessageData.MessageType GetMessageTypeId()
+        protected override MessageType GetMessageTypeId()
         {
             return MessageType.ChordSuccessorResponse;
         }

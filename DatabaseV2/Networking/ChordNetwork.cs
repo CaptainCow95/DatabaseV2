@@ -1,8 +1,8 @@
-﻿using DatabaseLibrary.Networking.Messaging;
+﻿using DatabaseV2.Networking.Messaging;
 using System;
 using System.Threading;
 
-namespace DatabaseLibrary.Networking
+namespace DatabaseV2.Networking
 {
     /// <summary>
     /// Represents a chord network.
@@ -15,14 +15,19 @@ namespace DatabaseLibrary.Networking
         private readonly ReaderWriterLockSlim _chordLock = new ReaderWriterLockSlim();
 
         /// <summary>
+        /// The chord finger table.
+        /// </summary>
+        private readonly ChordNode[] _fingerTable = new ChordNode[32];
+
+        /// <summary>
+        /// The current chord node.
+        /// </summary>
+        private readonly ChordNode _self;
+
+        /// <summary>
         /// The thread running the stabilization runtime.
         /// </summary>
         private readonly Thread _stabilizationThread;
-
-        /// <summary>
-        /// The chord finger table.
-        /// </summary>
-        private ChordNode[] _fingerTable = new ChordNode[32];
 
         /// <summary>
         /// The next finger to update during stabilization.
@@ -33,11 +38,6 @@ namespace DatabaseLibrary.Networking
         /// The predecessor chord node.
         /// </summary>
         private ChordNode _predecessor;
-
-        /// <summary>
-        /// The current chord node.
-        /// </summary>
-        private ChordNode _self;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ChordNetwork"/> class.
@@ -61,7 +61,7 @@ namespace DatabaseLibrary.Networking
             if (message.Success)
             {
                 var response = (ChordSuccessorResponse)message.Response.Data;
-                _fingerTable[0] = new ChordNode(response.Successor, response.ChordID);
+                _fingerTable[0] = new ChordNode(response.Successor, response.ChordId);
                 if (!Equals(_fingerTable[0], _self) && !Connect(_fingerTable[0].Node))
                 {
                     _fingerTable[0] = _self;
@@ -81,15 +81,16 @@ namespace DatabaseLibrary.Networking
             Console.WriteLine("Finger Table:");
             for (int i = 0; i < 32; ++i)
             {
-                if (_fingerTable[i] == null)
-                {
-                    Console.WriteLine("null");
-                }
-                else
-                {
-                    Console.WriteLine(_fingerTable[i].Node.ConnectionName);
-                }
+                Console.WriteLine(_fingerTable[i] == null ? "null" : _fingerTable[i].Node.ConnectionName);
             }
+        }
+
+        /// <inheritdoc />
+        public override void Shutdown()
+        {
+            base.Shutdown();
+
+            _stabilizationThread.Join();
         }
 
         /// <inheritdoc />
@@ -124,7 +125,7 @@ namespace DatabaseLibrary.Networking
             if (message.Data is ChordSuccessorRequest)
             {
                 _chordLock.EnterReadLock();
-                Message response = new Message(message, new ChordSuccessorResponse(_fingerTable[0].Node, _fingerTable[0].ChordID), false);
+                Message response = new Message(message, new ChordSuccessorResponse(_fingerTable[0].Node, _fingerTable[0].ChordId), false);
                 SendMessage(response);
                 _chordLock.ExitReadLock();
             }
@@ -133,7 +134,7 @@ namespace DatabaseLibrary.Networking
                 _chordLock.EnterReadLock();
                 var responseData = _predecessor == null
                     ? new ChordPredecessorResponse(new NodeDefinition(string.Empty, 0), 0)
-                    : new ChordPredecessorResponse(_predecessor.Node, _predecessor.ChordID);
+                    : new ChordPredecessorResponse(_predecessor.Node, _predecessor.ChordId);
                 Message response = new Message(message, responseData, false);
                 SendMessage(response);
                 _chordLock.ExitReadLock();
@@ -143,9 +144,9 @@ namespace DatabaseLibrary.Networking
                 _chordLock.EnterWriteLock();
 
                 var data = (ChordNotify)message.Data;
-                if (_predecessor == null || IsBetween(data.ChordID, _predecessor.ChordID, _self.ChordID))
+                if (_predecessor == null || IsBetween(data.ChordId, _predecessor.ChordId, _self.ChordId))
                 {
-                    _predecessor = new ChordNode(data.Node, data.ChordID);
+                    _predecessor = new ChordNode(data.Node, data.ChordId);
                     if (!Connect(_predecessor.Node))
                     {
                         _predecessor = null;
@@ -168,7 +169,7 @@ namespace DatabaseLibrary.Networking
             ChordNode ret = null;
             for (int i = 31; i >= 1; --i)
             {
-                if (_fingerTable[i] != null && IsBetween(_fingerTable[i].ChordID, _self.ChordID, id))
+                if (_fingerTable[i] != null && IsBetween(_fingerTable[i].ChordId, _self.ChordId, id))
                 {
                     ret = _fingerTable[i];
                     break;
@@ -193,7 +194,7 @@ namespace DatabaseLibrary.Networking
         {
             _chordLock.EnterReadLock();
 
-            if (_fingerTable[0] != null && (IsBetween(id, _self.ChordID, _fingerTable[0].ChordID) || id == _fingerTable[0].ChordID))
+            if (_fingerTable[0] != null && (IsBetween(id, _self.ChordId, _fingerTable[0].ChordId) || id == _fingerTable[0].ChordId))
             {
                 ChordNode ret = _fingerTable[0];
                 _chordLock.ExitReadLock();
@@ -213,7 +214,7 @@ namespace DatabaseLibrary.Networking
             }
 
             var response = (ChordSuccessorResponse)message.Response.Data;
-            return new ChordNode(response.Successor, response.ChordID);
+            return new ChordNode(response.Successor, response.ChordId);
         }
 
         /// <summary>
@@ -238,7 +239,7 @@ namespace DatabaseLibrary.Networking
         /// </summary>
         private void Stabilize()
         {
-            while (true)
+            while (Running)
             {
                 Thread.Sleep(500);
 
@@ -258,7 +259,7 @@ namespace DatabaseLibrary.Networking
                     }
 
                     var response = (ChordPredecessorResponse)message.Response.Data;
-                    predecessor = new ChordNode(response.Predecessor, response.ChordID);
+                    predecessor = new ChordNode(response.Predecessor, response.ChordId);
                 }
                 else
                 {
@@ -268,7 +269,7 @@ namespace DatabaseLibrary.Networking
 
                 _chordLock.EnterWriteLock();
 
-                if (predecessor.Node.Hostname != string.Empty && IsBetween(predecessor.ChordID, _self.ChordID, _fingerTable[0].ChordID))
+                if (predecessor.Node.Hostname != string.Empty && IsBetween(predecessor.ChordId, _self.ChordId, _fingerTable[0].ChordId))
                 {
                     _fingerTable[0] = predecessor;
                     if (!Equals(_fingerTable[0], _self) && !Connect(_fingerTable[0].Node))
@@ -283,7 +284,7 @@ namespace DatabaseLibrary.Networking
 
                 if (!Equals(_fingerTable[0], _self))
                 {
-                    message = new Message(_fingerTable[0].Node, new ChordNotify(_self.Node, _self.ChordID), false);
+                    message = new Message(_fingerTable[0].Node, new ChordNotify(_self.Node, _self.ChordId), false);
                     SendMessage(message);
                 }
 
@@ -296,7 +297,7 @@ namespace DatabaseLibrary.Networking
                     _nextFingerNode = 1;
                 }
 
-                var node = FindSuccessor(_self.ChordID + ((uint)1 << (_nextFingerNode - 1)));
+                var node = FindSuccessor(_self.ChordId + ((uint)1 << (_nextFingerNode - 1)));
                 if (node != null)
                 {
                     _chordLock.EnterWriteLock();
@@ -318,37 +319,53 @@ namespace DatabaseLibrary.Networking
         private class ChordNode
         {
             /// <summary>
+            /// The chord id.
+            /// </summary>
+            private readonly uint _chordId;
+
+            /// <summary>
+            /// The node definition.
+            /// </summary>
+            private readonly NodeDefinition _node;
+
+            /// <summary>
             /// Initializes a new instance of the <see cref="ChordNode"/> class.
             /// </summary>
             /// <param name="node">The node specified in this <see cref="ChordNode"/>.</param>
             /// <param name="chordId">The chord ID.</param>
             public ChordNode(NodeDefinition node, uint chordId)
             {
-                Node = node;
-                ChordID = chordId;
+                _node = node;
+                _chordId = chordId;
             }
 
             /// <summary>
-            /// Gets or sets the chord ID.
+            /// Gets the chord ID.
             /// </summary>
-            public uint ChordID { get; set; }
+            public uint ChordId
+            {
+                get { return _chordId; }
+            }
 
             /// <summary>
-            /// Gets or sets the node.
+            /// Gets the node.
             /// </summary>
-            public NodeDefinition Node { get; set; }
+            public NodeDefinition Node
+            {
+                get { return _node; }
+            }
 
             /// <inheritdoc />
             public override bool Equals(object obj)
             {
                 ChordNode node = obj as ChordNode;
-                return node != null && Equals(node.Node, Node) && Equals(node.ChordID, ChordID);
+                return node != null && Equals(node.Node, Node) && Equals(node.ChordId, ChordId);
             }
 
             /// <inheritdoc />
             public override int GetHashCode()
             {
-                return Node.GetHashCode() + ChordID.GetHashCode();
+                return Node.GetHashCode() + ChordId.GetHashCode();
             }
         }
     }

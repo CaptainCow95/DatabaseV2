@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DatabaseLibrary.Networking.Messaging
+namespace DatabaseV2.Networking.Messaging
 {
     /// <summary>
     /// Represents the data contained in a message.
@@ -54,7 +54,7 @@ namespace DatabaseLibrary.Networking.Messaging
         /// <param name="data">The message data.</param>
         /// <param name="index">The current index in the data.</param>
         /// <returns>The message this data represents.</returns>
-        internal static MessageData Decode(byte[] data, int index)
+        public static MessageData Decode(byte[] data, int index)
         {
             int messageTypeId = ByteArrayHelper.ToInt32(data, ref index);
             switch ((MessageType)Enum.ToObject(typeof(MessageType), messageTypeId))
@@ -89,7 +89,7 @@ namespace DatabaseLibrary.Networking.Messaging
         /// Encodes the data in the message.
         /// </summary>
         /// <returns>The encoded data.</returns>
-        internal byte[] Encode()
+        public byte[] Encode()
         {
             return ByteArrayHelper.Combine(ByteArrayHelper.ToBytes((int)GetMessageTypeId()), EncodeData());
         }

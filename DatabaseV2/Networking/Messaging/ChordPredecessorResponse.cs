@@ -1,19 +1,19 @@
-﻿namespace DatabaseLibrary.Networking.Messaging
+﻿namespace DatabaseV2.Networking.Messaging
 {
     /// <summary>
     /// Represents a response to a <see cref="ChordPredecessorRequest"/>.
     /// </summary>
-    internal class ChordPredecessorResponse : MessageData
+    public class ChordPredecessorResponse : MessageData
     {
         /// <summary>
         /// The chord ID of the node.
         /// </summary>
-        private uint _chordId;
+        private readonly uint _chordId;
 
         /// <summary>
         /// The predecessor node.
         /// </summary>
-        private NodeDefinition _predecessor;
+        private readonly NodeDefinition _predecessor;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ChordPredecessorResponse"/> class.
@@ -31,7 +31,7 @@
         /// </summary>
         /// <param name="data">The data to decode.</param>
         /// <param name="index">The index in the data.</param>
-        internal ChordPredecessorResponse(byte[] data, int index)
+        public ChordPredecessorResponse(byte[] data, int index)
         {
             _predecessor = new NodeDefinition(ByteArrayHelper.ToString(data, ref index), ByteArrayHelper.ToInt32(data, ref index));
             _chordId = ByteArrayHelper.ToUInt32(data, ref index);
@@ -40,7 +40,7 @@
         /// <summary>
         /// Gets the chord ID of the node.
         /// </summary>
-        public uint ChordID
+        public uint ChordId
         {
             get { return _chordId; }
         }
@@ -60,7 +60,7 @@
         }
 
         /// <inheritdoc />
-        protected override MessageData.MessageType GetMessageTypeId()
+        protected override MessageType GetMessageTypeId()
         {
             return MessageType.ChordPredecessorResponse;
         }

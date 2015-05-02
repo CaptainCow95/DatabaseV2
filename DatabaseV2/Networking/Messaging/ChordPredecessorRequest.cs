@@ -1,9 +1,9 @@
-﻿namespace DatabaseLibrary.Networking.Messaging
+﻿namespace DatabaseV2.Networking.Messaging
 {
     /// <summary>
     /// Represents a request for a node's predecessor.
     /// </summary>
-    internal class ChordPredecessorRequest : MessageData
+    public class ChordPredecessorRequest : MessageData
     {
         /// <inheritdoc />
         protected override byte[] EncodeData()
@@ -12,7 +12,7 @@
         }
 
         /// <inheritdoc />
-        protected override MessageData.MessageType GetMessageTypeId()
+        protected override MessageType GetMessageTypeId()
         {
             return MessageType.ChordPredecessorRequest;
         }

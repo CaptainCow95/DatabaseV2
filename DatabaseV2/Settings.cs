@@ -1,4 +1,5 @@
-﻿using System;
+﻿using DatabaseV2.Networking;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -12,7 +13,7 @@ namespace DatabaseV2
         /// <summary>
         /// Gets or sets the nodes to initially connect to.
         /// </summary>
-        public List<Node> Nodes { get; set; }
+        public List<NodeDefinition> Nodes { get; set; }
 
         /// <summary>
         /// Gets or sets the port to run the database on.
@@ -25,11 +26,11 @@ namespace DatabaseV2
         /// <param name="nodeList">The string to parse.</param>
         public void ParseNodeList(string nodeList)
         {
-            List<Node> nodes = new List<Node>();
+            List<NodeDefinition> nodes = new List<NodeDefinition>();
             var parts = nodeList.Split(',');
             try
             {
-                nodes.AddRange(parts.Select(t => new Node(t)));
+                nodes.AddRange(parts.Select(t => new NodeDefinition(t)));
                 Nodes = nodes;
             }
             catch (ArgumentException)

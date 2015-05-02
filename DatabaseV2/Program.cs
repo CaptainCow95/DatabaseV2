@@ -1,4 +1,4 @@
-﻿using DatabaseLibrary.Networking;
+﻿using DatabaseV2.Networking;
 using System;
 using System.Threading;
 
@@ -7,7 +7,7 @@ namespace DatabaseV2
     /// <summary>
     /// The entry point of the program.
     /// </summary>
-    public class Program
+    public static class Program
     {
         /// <summary>
         /// The entry point of the program.

@@ -1,8 +1,8 @@
-﻿using DatabaseLibrary.Networking.Messaging;
+﻿using DatabaseV2.Networking.Messaging;
 using System;
 using System.Threading;
 
-namespace DatabaseLibrary.Networking
+namespace DatabaseV2.Networking
 {
     /// <summary>
     /// Represents a network message.
@@ -40,11 +40,6 @@ namespace DatabaseLibrary.Networking
         private readonly bool _waitingForResponse;
 
         /// <summary>
-        /// The data contained in the message.
-        /// </summary>
-        private MessageData _data;
-
-        /// <summary>
         /// A value indicating whether an already identified connection to send the message.
         /// </summary>
         private bool _requireSecureConnection = true;
@@ -59,7 +54,7 @@ namespace DatabaseLibrary.Networking
         public Message(NodeDefinition address, MessageData data, bool waitingForResponse, uint timeout = 60)
         {
             Address = address;
-            _data = data;
+            Data = data;
             _id = GetNextId();
             _waitingForResponse = waitingForResponse;
             _expireTime = DateTime.UtcNow.AddSeconds(timeout);
@@ -87,7 +82,7 @@ namespace DatabaseLibrary.Networking
         /// <param name="address">The address the message is from.</param>
         /// <param name="data">The data that represents the message.</param>
         /// <param name="type">The type of connection the message came from.</param>
-        internal Message(NodeDefinition address, byte[] data, ConnectionType type)
+        public Message(NodeDefinition address, byte[] data, ConnectionType type)
         {
             Address = address;
             Type = type;
@@ -96,23 +91,20 @@ namespace DatabaseLibrary.Networking
             _id = ByteArrayHelper.ToUInt32(data, ref index);
             _inResponseTo = ByteArrayHelper.ToUInt32(data, ref index);
             _waitingForResponse = ByteArrayHelper.ToBoolean(data, ref index);
-            _data = MessageData.Decode(data, index);
+            Data = MessageData.Decode(data, index);
 
             Status = MessageStatus.Received;
         }
 
         /// <summary>
-        /// Gets the location to send the message to.
+        /// Gets or sets the location to send the message to.
         /// </summary>
-        public NodeDefinition Address { get; internal set; }
+        public NodeDefinition Address { get; set; }
 
         /// <summary>
         /// Gets the data contained in the message.
         /// </summary>
-        public MessageData Data
-        {
-            get { return _data; }
-        }
+        public MessageData Data { get; private set; }
 
         /// <summary>
         /// Gets the expire time of the message.
@@ -123,11 +115,28 @@ namespace DatabaseLibrary.Networking
         }
 
         /// <summary>
+        /// Gets the ID of the message.
+        /// </summary>
+        public uint Id
+        {
+            get { return _id; }
+        }
+
+        /// <summary>
         /// Gets the message ID the message is in response to.
         /// </summary>
         public uint InResponseTo
         {
             get { return _inResponseTo; }
+        }
+
+        /// <summary>
+        /// Gets or sets a value indicating whether an already identified connection to send the message.
+        /// </summary>
+        public bool RequireSecureConnection
+        {
+            get { return _requireSecureConnection; }
+            set { _requireSecureConnection = value; }
         }
 
         /// <summary>
@@ -141,9 +150,9 @@ namespace DatabaseLibrary.Networking
         public Action<Message> ResponseCallback { get; set; }
 
         /// <summary>
-        /// Gets the status of the message.
+        /// Gets or sets the status of the message.
         /// </summary>
-        public MessageStatus Status { get; internal set; }
+        public MessageStatus Status { get; set; }
 
         /// <summary>
         /// Gets a value indicating whether the message was sent successfully if it is not waiting for a response, otherwise it indicates whether the response has been successfully received.
@@ -154,34 +163,17 @@ namespace DatabaseLibrary.Networking
         }
 
         /// <summary>
+        /// Gets the type of the connection.
+        /// </summary>
+        public ConnectionType Type { get; private set; }
+
+        /// <summary>
         /// Gets a value indicating whether the message is waiting for a response.
         /// </summary>
         public bool WaitingForResponse
         {
             get { return _waitingForResponse; }
         }
-
-        /// <summary>
-        /// Gets the ID of the message.
-        /// </summary>
-        internal uint ID
-        {
-            get { return _id; }
-        }
-
-        /// <summary>
-        /// Gets or sets a value indicating whether an already identified connection to send the message.
-        /// </summary>
-        internal bool RequireSecureConnection
-        {
-            get { return _requireSecureConnection; }
-            set { _requireSecureConnection = value; }
-        }
-
-        /// <summary>
-        /// Gets the type of the connection.
-        /// </summary>
-        internal ConnectionType Type { get; private set; }
 
         /// <summary>
         /// Blocks until an error occurs, the message is sent successfully if it isn't waiting for a response, or until a response is received if it is waiting for a response.
@@ -203,7 +195,7 @@ namespace DatabaseLibrary.Networking
             byte[] idBytes = ByteArrayHelper.ToBytes(_id);
             byte[] inResponseToBytes = ByteArrayHelper.ToBytes(_inResponseTo);
             byte[] waitingForResponseBytes = ByteArrayHelper.ToBytes(_waitingForResponse);
-            byte[] data = _data.Encode();
+            byte[] data = Data.Encode();
             int length = idBytes.Length + inResponseToBytes.Length + waitingForResponseBytes.Length + data.Length;
 
             return ByteArrayHelper.Combine(ByteArrayHelper.ToBytes(length), idBytes, inResponseToBytes, waitingForResponseBytes, data);
@@ -215,16 +207,16 @@ namespace DatabaseLibrary.Networking
         /// <returns>The next message ID.</returns>
         private static uint GetNextId()
         {
-            lock (NextIdLockObject)
+            Monitor.Enter(NextIdLockObject);
+            ++_nextId;
+            if (_nextId == 0)
             {
                 ++_nextId;
-                if (_nextId == 0)
-                {
-                    ++_nextId;
-                }
-
-                return _nextId;
             }
+
+            uint temp = _nextId;
+            Monitor.Exit(NextIdLockObject);
+            return temp;
         }
     }
 }

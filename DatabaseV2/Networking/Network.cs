@@ -1,5 +1,5 @@
 ﻿using Amib.Threading;
-using DatabaseLibrary.Networking.Messaging;
+using DatabaseV2.Networking.Messaging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +7,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
-namespace DatabaseLibrary.Networking
+namespace DatabaseV2.Networking
 {
     /// <summary>
     /// Handles network connections.
@@ -80,6 +80,8 @@ namespace DatabaseLibrary.Networking
         /// <param name="port">The port to listen for connections on.</param>
         protected Network(int port)
         {
+            Running = true;
+
             _port = port;
 
             _messageSendPool.Start();
@@ -88,7 +90,7 @@ namespace DatabaseLibrary.Networking
             _messageReceivingThread = new Thread(ReceiveMessages);
             _messageReceivingThread.Start();
 
-            _cleanerThread = new Thread(CleanConnections);
+            _cleanerThread = new Thread(RunCleaner);
             _cleanerThread.Start();
 
             _listener = new TcpListener(IPAddress.Any, port);
@@ -105,12 +107,30 @@ namespace DatabaseLibrary.Networking
         }
 
         /// <summary>
+        /// Gets a value indicating whether the network is running.
+        /// </summary>
+        protected bool Running { get; private set; }
+
+        /// <summary>
         /// Gets a list of the connected nodes.
         /// </summary>
         /// <returns>A list of the connected nodes.</returns>
         public IEnumerable<NodeDefinition> GetConnectedNodes()
         {
             return _outgoingConnections.Select(e => e.Key);
+        }
+
+        /// <summary>
+        /// Shuts down the network.
+        /// </summary>
+        public virtual void Shutdown()
+        {
+            Running = false;
+            _listener.Stop();
+            _messageReceivingThread.Join();
+            _cleanerThread.Join();
+            _messageReceivedPool.Shutdown();
+            _messageSendPool.Shutdown();
         }
 
         /// <summary>
@@ -170,36 +190,38 @@ namespace DatabaseLibrary.Networking
         }
 
         /// <summary>
-        /// Cleans up and disconnected connections.
+        /// Cleans up disconnected connections.
         /// </summary>
-        private void CleanConnections()
+        /// <param name="connectionsLock">The connections lock.</param>
+        /// <param name="connections">The connection list.</param>
+        private void CleanConnections(ReaderWriterLockSlim connectionsLock, Dictionary<NodeDefinition, Connection> connections)
         {
+            connectionsLock.EnterWriteLock();
             List<NodeDefinition> removedConnections = new List<NodeDefinition>();
-            while (true)
+            removedConnections.Clear();
+            removedConnections.AddRange(connections.Where(e => e.Value.Status == ConnectionStatus.Disconnected).Select(e => e.Key));
+            removedConnections.ForEach(e => connections.Remove(e));
+            connectionsLock.ExitWriteLock();
+
+            removedConnections.ForEach(e => _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(e, ConnectionType.Outgoing)));
+            removedConnections.ForEach(Disconnection);
+
+            Monitor.Enter(_waitingForResponses);
+            List<uint> removedMessages = new List<uint>();
+            foreach (var connection in removedConnections)
             {
-                Thread.Sleep(5000);
-
-                lock (_messagesReceived)
+                foreach (var message in _waitingForResponses)
                 {
-                    _outgoingConnectionsLock.EnterWriteLock();
-                    removedConnections.Clear();
-                    removedConnections.AddRange(_outgoingConnections.Where(e => e.Value.Status == ConnectionStatus.Disconnected).Select(e => e.Key));
-                    removedConnections.ForEach(e => _outgoingConnections.Remove(e));
-                    _outgoingConnectionsLock.ExitWriteLock();
-
-                    removedConnections.ForEach(e => _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(e, ConnectionType.Outgoing)));
-                    removedConnections.ForEach(Disconnection);
-
-                    _incomingConnectionsLock.EnterWriteLock();
-                    removedConnections.Clear();
-                    removedConnections.AddRange(_incomingConnections.Where(e => e.Value.Status == ConnectionStatus.Disconnected).Select(e => e.Key));
-                    removedConnections.ForEach(e => _incomingConnections.Remove(e));
-                    _incomingConnectionsLock.ExitWriteLock();
-
-                    removedConnections.ForEach(e => _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(e, ConnectionType.Incoming)));
-                    removedConnections.ForEach(Disconnection);
+                    if (message.Value.Address.Equals(connection))
+                    {
+                        message.Value.Status = MessageStatus.ResponseFailure;
+                        removedMessages.Add(message.Key);
+                    }
                 }
             }
+
+            removedMessages.ForEach(e => _waitingForResponses.Remove(e));
+            Monitor.Exit(_waitingForResponses);
         }
 
         /// <summary>
@@ -240,21 +262,22 @@ namespace DatabaseLibrary.Networking
 
             if (message.InResponseTo != 0)
             {
-                lock (_waitingForResponses)
-                {
-                    if (_waitingForResponses.ContainsKey(message.InResponseTo))
-                    {
-                        Message waiting = _waitingForResponses[message.InResponseTo];
-                        waiting.Response = message;
-                        waiting.Status = MessageStatus.ResponseReceived;
-                        if (waiting.ResponseCallback != null)
-                        {
-                            _messageReceivedPool.QueueWorkItem(waiting.ResponseCallback, waiting);
-                        }
+                Monitor.Enter(_waitingForResponses);
 
-                        _waitingForResponses.Remove(message.InResponseTo);
+                if (_waitingForResponses.ContainsKey(message.InResponseTo))
+                {
+                    Message waiting = _waitingForResponses[message.InResponseTo];
+                    waiting.Response = message;
+                    waiting.Status = MessageStatus.ResponseReceived;
+                    if (waiting.ResponseCallback != null)
+                    {
+                        _messageReceivedPool.QueueWorkItem(waiting.ResponseCallback, waiting);
                     }
+
+                    _waitingForResponses.Remove(message.InResponseTo);
                 }
+
+                Monitor.Exit(_waitingForResponses);
             }
             else
             {
@@ -271,7 +294,7 @@ namespace DatabaseLibrary.Networking
             var incoming = _listener.EndAcceptTcpClient(result);
             _listener.BeginAcceptTcpClient(ProcessRequest, null);
 
-            Connection connection = new Connection(incoming, ConnectionType.Incoming);
+            Connection connection = new Connection(incoming);
 
             _incomingConnectionsLock.EnterWriteLock();
 
@@ -287,94 +310,92 @@ namespace DatabaseLibrary.Networking
         private void ReceiveMessages()
         {
             var messageBuffer = new byte[1024];
-            while (true)
+            while (Running)
             {
                 List<Tuple<NodeDefinition, ConnectionType, byte[]>> messages = new List<Tuple<NodeDefinition, ConnectionType, byte[]>>();
-                lock (_messagesReceived)
+                Monitor.Enter(_messagesReceived);
+                _outgoingConnectionsLock.EnterReadLock();
+
+                foreach (var connection in _outgoingConnections)
                 {
-                    _outgoingConnectionsLock.EnterReadLock();
-
-                    foreach (var connection in _outgoingConnections)
+                    if (!connection.Value.Client.Connected)
                     {
-                        if (!connection.Value.Client.Connected)
-                        {
-                            continue;
-                        }
-
-                        var key = new Tuple<NodeDefinition, ConnectionType>(connection.Key, ConnectionType.Outgoing);
-                        if (!_messagesReceived.ContainsKey(key))
-                        {
-                            _messagesReceived.Add(key, new List<byte>(1024));
-                        }
-
-                        try
-                        {
-                            NetworkStream stream = connection.Value.Client.GetStream();
-                            while (stream.DataAvailable)
-                            {
-                                int bytesRead = stream.Read(messageBuffer, 0, 1024);
-                                _messagesReceived[key].AddRange(messageBuffer.Take(bytesRead));
-                                connection.Value.Active();
-                            }
-                        }
-                        catch
-                        {
-                            // The stream was closed, do nothing.
-                        }
+                        continue;
                     }
 
-                    _outgoingConnectionsLock.ExitReadLock();
-
-                    _incomingConnectionsLock.EnterReadLock();
-
-                    foreach (var connection in _incomingConnections)
+                    var key = new Tuple<NodeDefinition, ConnectionType>(connection.Key, ConnectionType.Outgoing);
+                    if (!_messagesReceived.ContainsKey(key))
                     {
-                        if (!connection.Value.Client.Connected)
-                        {
-                            continue;
-                        }
-
-                        var key = new Tuple<NodeDefinition, ConnectionType>(connection.Key, ConnectionType.Incoming);
-                        if (!_messagesReceived.ContainsKey(key))
-                        {
-                            _messagesReceived.Add(key, new List<byte>(1024));
-                        }
-
-                        try
-                        {
-                            NetworkStream stream = connection.Value.Client.GetStream();
-                            while (stream.DataAvailable)
-                            {
-                                int bytesRead = stream.Read(messageBuffer, 0, 1024);
-                                _messagesReceived[key].AddRange(messageBuffer.Take(bytesRead));
-                                connection.Value.Active();
-                            }
-                        }
-                        catch
-                        {
-                            // The stream was closed, do nothing.
-                        }
+                        _messagesReceived.Add(key, new List<byte>(1024));
                     }
 
-                    _incomingConnectionsLock.ExitReadLock();
-
-                    foreach (var message in _messagesReceived)
+                    try
                     {
-                        while (message.Value.Count >= 4)
+                        NetworkStream stream = connection.Value.Client.GetStream();
+                        while (stream.DataAvailable)
                         {
-                            int length = BitConverter.ToInt32(message.Value.Take(4).ToArray(), 0);
-                            if (message.Value.Count >= length + 4)
-                            {
-                                messages.Add(new Tuple<NodeDefinition, ConnectionType, byte[]>(message.Key.Item1, message.Key.Item2, message.Value.Skip(4).Take(length).ToArray()));
-                                message.Value.RemoveRange(0, length + 4);
-                            }
-                            else
-                            {
-                                break;
-                            }
+                            int bytesRead = stream.Read(messageBuffer, 0, 1024);
+                            _messagesReceived[key].AddRange(messageBuffer.Take(bytesRead));
+                        }
+                    }
+                    catch
+                    {
+                        // The stream was closed, do nothing.
+                    }
+                }
+
+                _outgoingConnectionsLock.ExitReadLock();
+
+                _incomingConnectionsLock.EnterReadLock();
+
+                foreach (var connection in _incomingConnections)
+                {
+                    if (!connection.Value.Client.Connected)
+                    {
+                        continue;
+                    }
+
+                    var key = new Tuple<NodeDefinition, ConnectionType>(connection.Key, ConnectionType.Incoming);
+                    if (!_messagesReceived.ContainsKey(key))
+                    {
+                        _messagesReceived.Add(key, new List<byte>(1024));
+                    }
+
+                    try
+                    {
+                        NetworkStream stream = connection.Value.Client.GetStream();
+                        while (stream.DataAvailable)
+                        {
+                            int bytesRead = stream.Read(messageBuffer, 0, 1024);
+                            _messagesReceived[key].AddRange(messageBuffer.Take(bytesRead));
+                        }
+                    }
+                    catch
+                    {
+                        // The stream was closed, do nothing.
+                    }
+                }
+
+                _incomingConnectionsLock.ExitReadLock();
+
+                foreach (var message in _messagesReceived)
+                {
+                    while (message.Value.Count >= 4)
+                    {
+                        int length = BitConverter.ToInt32(message.Value.Take(4).ToArray(), 0);
+                        if (message.Value.Count >= length + 4)
+                        {
+                            messages.Add(new Tuple<NodeDefinition, ConnectionType, byte[]>(message.Key.Item1, message.Key.Item2, message.Value.Skip(4).Take(length).ToArray()));
+                            message.Value.RemoveRange(0, length + 4);
+                        }
+                        else
+                        {
+                            break;
                         }
                     }
                 }
+
+                Monitor.Exit(_messagesReceived);
 
                 foreach (var message in messages)
                 {
@@ -397,37 +418,70 @@ namespace DatabaseLibrary.Networking
                 return;
             }
 
-            lock (_messagesReceived)
+            Monitor.Enter(_messagesReceived);
+            _incomingConnectionsLock.EnterWriteLock();
+
+            if (_incomingConnections.ContainsKey(currentName))
             {
-                _incomingConnectionsLock.EnterWriteLock();
-
-                if (_incomingConnections.ContainsKey(currentName))
+                if (_incomingConnections.ContainsKey(newName))
                 {
-                    if (_incomingConnections.ContainsKey(newName))
-                    {
-                        _incomingConnections.Remove(newName);
-                    }
+                    _incomingConnections.Remove(newName);
+                }
 
-                    var messagesKey = new Tuple<NodeDefinition, ConnectionType>(newName, ConnectionType.Incoming);
-                    if (_messagesReceived.ContainsKey(messagesKey))
-                    {
-                        _messagesReceived.Remove(messagesKey);
-                    }
+                var messagesKey = new Tuple<NodeDefinition, ConnectionType>(newName, ConnectionType.Incoming);
+                if (_messagesReceived.ContainsKey(messagesKey))
+                {
+                    _messagesReceived.Remove(messagesKey);
+                }
 
-                    var connection = _incomingConnections[currentName];
-                    _incomingConnections.Remove(currentName);
-                    _incomingConnections.Add(newName, connection);
+                var connection = _incomingConnections[currentName];
+                _incomingConnections.Remove(currentName);
+                _incomingConnections.Add(newName, connection);
 
-                    messagesKey = new Tuple<NodeDefinition, ConnectionType>(currentName, ConnectionType.Incoming);
-                    if (_messagesReceived.ContainsKey(messagesKey))
+                messagesKey = new Tuple<NodeDefinition, ConnectionType>(currentName, ConnectionType.Incoming);
+                if (_messagesReceived.ContainsKey(messagesKey))
+                {
+                    var messageList = _messagesReceived[messagesKey];
+                    _messagesReceived.Remove(messagesKey);
+                    _messagesReceived.Add(new Tuple<NodeDefinition, ConnectionType>(newName, ConnectionType.Incoming), messageList);
+                }
+            }
+
+            _incomingConnectionsLock.ExitWriteLock();
+            Monitor.Exit(_messagesReceived);
+        }
+
+        /// <summary>
+        /// Cleans up any disconnected connections and expired messages.
+        /// </summary>
+        private void RunCleaner()
+        {
+            while (Running)
+            {
+                Thread.Sleep(5000);
+
+                Monitor.Enter(_messagesReceived);
+
+                CleanConnections(_outgoingConnectionsLock, _outgoingConnections);
+                CleanConnections(_incomingConnectionsLock, _incomingConnections);
+
+                Monitor.Exit(_messagesReceived);
+
+                Monitor.Enter(_waitingForResponses);
+
+                List<uint> removedMessages = new List<uint>();
+                foreach (var message in _waitingForResponses)
+                {
+                    if (message.Value.ExpireTime < DateTime.UtcNow)
                     {
-                        var messageList = _messagesReceived[messagesKey];
-                        _messagesReceived.Remove(messagesKey);
-                        _messagesReceived.Add(new Tuple<NodeDefinition, ConnectionType>(newName, ConnectionType.Incoming), messageList);
+                        message.Value.Status = MessageStatus.ResponseTimeout;
+                        removedMessages.Add(message.Key);
                     }
                 }
 
-                _incomingConnectionsLock.ExitWriteLock();
+                removedMessages.ForEach(e => _waitingForResponses.Remove(e));
+
+                Monitor.Exit(_waitingForResponses);
             }
         }
 
@@ -449,10 +503,9 @@ namespace DatabaseLibrary.Networking
                 {
                     if (message.WaitingForResponse)
                     {
-                        lock (_waitingForResponses)
-                        {
-                            _waitingForResponses.Add(message.ID, message);
-                        }
+                        Monitor.Enter(_waitingForResponses);
+                        _waitingForResponses.Add(message.Id, message);
+                        Monitor.Exit(_waitingForResponses);
                     }
 
                     byte[] dataToSend = message.EncodeMessage();
@@ -466,10 +519,9 @@ namespace DatabaseLibrary.Networking
                     message.Status = MessageStatus.SendingFailure;
                     connections[message.Address].Disconnected();
 
-                    lock (_waitingForResponses)
-                    {
-                        _waitingForResponses.Remove(message.ID);
-                    }
+                    Monitor.Enter(_waitingForResponses);
+                    _waitingForResponses.Remove(message.Id);
+                    Monitor.Exit(_waitingForResponses);
                 }
             }
             else if (!connections.ContainsKey(message.Address))
@@ -520,7 +572,7 @@ namespace DatabaseLibrary.Networking
 
                     if (!_outgoingConnections.ContainsKey(message.Address))
                     {
-                        _outgoingConnections.Add(message.Address, new Connection(client, ConnectionType.Outgoing));
+                        _outgoingConnections.Add(message.Address, new Connection(client));
                     }
 
                     _outgoingConnectionsLock.ExitWriteLock();

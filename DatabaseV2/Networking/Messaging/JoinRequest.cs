@@ -1,9 +1,9 @@
-﻿namespace DatabaseLibrary.Networking.Messaging
+﻿namespace DatabaseV2.Networking.Messaging
 {
     /// <summary>
     /// Represents a request to join a network.
     /// </summary>
-    internal class JoinRequest : MessageData
+    public class JoinRequest : MessageData
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="JoinRequest"/> class.
@@ -19,7 +19,7 @@
         /// </summary>
         /// <param name="data">The data to decode.</param>
         /// <param name="index">The index in the data.</param>
-        internal JoinRequest(byte[] data, int index)
+        public JoinRequest(byte[] data, int index)
         {
             Address = new NodeDefinition(ByteArrayHelper.ToString(data, ref index), ByteArrayHelper.ToInt32(data, ref index));
         }

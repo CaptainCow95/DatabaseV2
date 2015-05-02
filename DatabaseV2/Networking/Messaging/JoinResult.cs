@@ -1,9 +1,9 @@
-﻿namespace DatabaseLibrary.Networking.Messaging
+﻿namespace DatabaseV2.Networking.Messaging
 {
     /// <summary>
     /// Represents the result of attempting to join a network.
     /// </summary>
-    internal class JoinResult : MessageData
+    public class JoinResult : MessageData
     {
         /// <summary>
         /// Initializes a new instance of the <see cref="JoinResult"/> class.
@@ -17,7 +17,7 @@
         /// </summary>
         /// <param name="data">The data to decode.</param>
         /// <param name="index">The index in the data.</param>
-        internal JoinResult(byte[] data, int index)
+        public JoinResult(byte[] data, int index)
         {
         }
 
