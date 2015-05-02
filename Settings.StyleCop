@@ -1,10 +1,13 @@
 <StyleCopSettings Version="105">
   <GlobalSettings>
     <CollectionProperty Name="DeprecatedWords">
-      <Value>preprocessor,pre-processor</Value>
-      <Value>shortlived,short-lived</Value>
+      <Value>preprocessor, pre-processor</Value>
+      <Value>shortlived, short-lived</Value>
     </CollectionProperty>
     <StringProperty Name="MergeSettingsFiles">NoMerge</StringProperty>
+    <CollectionProperty Name="RecognizedWords">
+      <Value>localhost</Value>
+    </CollectionProperty>
   </GlobalSettings>
   <Parsers>
     <Parser ParserId="StyleCop.CSharp.CsParser">
