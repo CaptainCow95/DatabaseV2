@@ -1,5 +1,7 @@
 ﻿using DatabaseV2.Networking.Messaging;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 
 namespace DatabaseV2.Networking
@@ -43,8 +45,8 @@ namespace DatabaseV2.Networking
         /// Initializes a new instance of the <see cref="ChordNetwork"/> class.
         /// </summary>
         /// <param name="port">The port to listen for connections on.</param>
-        /// <param name="node">The node to try to connect to the network of.</param>
-        public ChordNetwork(int port, NodeDefinition node)
+        /// <param name="nodes">The nodes to try to connect to the network of.</param>
+        public ChordNetwork(int port, List<NodeDefinition> nodes)
             : base(port)
         {
             byte[] randomBytes = new byte[4];
@@ -54,17 +56,22 @@ namespace DatabaseV2.Networking
             _self = new ChordNode(new NodeDefinition("localhost", Port), chordId);
             _fingerTable[0] = _self;
 
-            Connect(node);
-            Message message = new Message(node, new ChordSuccessorRequest(), true);
-            SendMessage(message);
-            message.BlockUntilDone();
-            if (message.Success)
+            foreach (var node in nodes)
             {
-                var response = (ChordSuccessorResponse)message.Response.Data;
-                _fingerTable[0] = new ChordNode(response.Successor, response.ChordId);
-                if (!Equals(_fingerTable[0], _self) && !Connect(_fingerTable[0].Node))
+                if (Connect(node))
                 {
-                    _fingerTable[0] = _self;
+                    Message message = new Message(node, new ChordSuccessorRequest(), true);
+                    SendMessage(message);
+                    message.BlockUntilDone();
+                    if (message.Success)
+                    {
+                        var response = (ChordSuccessorResponse)message.Response.Data;
+                        _fingerTable[0] = new ChordNode(response.Successor, response.ChordId);
+                        if (!Equals(_fingerTable[0], _self) && !Connect(_fingerTable[0].Node))
+                        {
+                            _fingerTable[0] = _self;
+                        }
+                    }
                 }
             }
 
@@ -73,16 +80,19 @@ namespace DatabaseV2.Networking
         }
 
         /// <summary>
-        /// Prints out the status of the chord network.
+        /// Gets the node's finger table.
         /// </summary>
-        public void PrintStatus()
+        public IEnumerable<NodeDefinition> FingerTable
         {
-            Console.WriteLine("Predecessor: " + (_predecessor == null ? "null" : _predecessor.Node.ConnectionName));
-            Console.WriteLine("Finger Table:");
-            for (int i = 0; i < 32; ++i)
-            {
-                Console.WriteLine(_fingerTable[i] == null ? "null" : _fingerTable[i].Node.ConnectionName);
-            }
+            get { return _fingerTable.Select(e => e == null ? null : e.Node); }
+        }
+
+        /// <summary>
+        /// Gets the node's predecessor in the chord ring.
+        /// </summary>
+        public NodeDefinition Predecessor
+        {
+            get { return _predecessor == null ? null : _predecessor.Node; }
         }
 
         /// <inheritdoc />
@@ -90,7 +100,10 @@ namespace DatabaseV2.Networking
         {
             base.Shutdown();
 
-            _stabilizationThread.Join();
+            if (!_stabilizationThread.Join(5000))
+            {
+                _stabilizationThread.Abort();
+            }
         }
 
         /// <inheritdoc />

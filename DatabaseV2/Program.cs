@@ -1,6 +1,7 @@
 ﻿using DatabaseV2.Networking;
 using System;
-using System.Threading;
+using System.Collections.Generic;
+using System.Linq;
 
 namespace DatabaseV2
 {
@@ -15,8 +16,9 @@ namespace DatabaseV2
         /// <param name="args">The arguments to the program.</param>
         private static void Main(string[] args)
         {
-            Settings settings = new Settings();
-
+            int port = -1;
+            List<NodeDefinition> nodes = new List<NodeDefinition>();
+            bool enableWebInterface = false;
             for (int i = 0; i < args.Length; ++i)
             {
                 string arg = args[i].ToLowerInvariant();
@@ -24,16 +26,12 @@ namespace DatabaseV2
                 {
                     if (i + 1 < args.Length)
                     {
-                        int port;
                         if (int.TryParse(args[i + 1], out port))
                         {
                             ++i;
-                            if (port >= 1 && port <= 65535)
+                            if (port < 1 && port > 65535)
                             {
-                                settings.Port = port;
-                            }
-                            else
-                            {
+                                port = -1;
                                 Console.WriteLine("--port argument provided, but was not followed by a valid port between 1 and 65535.");
                             }
                         }
@@ -52,25 +50,46 @@ namespace DatabaseV2
                     if (i + 1 < args.Length)
                     {
                         ++i;
-                        settings.ParseNodeList(args[i + 1]);
+                        var parts = args[i].Split(',');
+                        try
+                        {
+                            nodes.AddRange(parts.Select(t => new NodeDefinition(t)));
+                        }
+                        catch (ArgumentException)
+                        {
+                            nodes.Clear();
+                            Console.WriteLine("Connection string is not in the right format.");
+                        }
                     }
                     else
                     {
                         Console.WriteLine("--nodes argument provided, but was not followed by a value.");
                     }
                 }
+                else if (arg == "--enablewebinterface")
+                {
+                    enableWebInterface = true;
+                }
             }
 
-            ChordNetwork network = new ChordNetwork(int.Parse(args[0]), new NodeDefinition("localhost", int.Parse(args[1])));
-
-            while (true)
+            if (port == -1)
             {
-                Thread.Sleep(1000);
-                Console.Clear();
-                Console.WriteLine("Running on port " + int.Parse(args[0]));
-                Console.WriteLine("Printing Chord Status:");
-                network.PrintStatus();
+                Console.WriteLine("No port given, defaulting to 5000");
+                port = 5000;
             }
+
+            if (nodes.Count == 0)
+            {
+                Console.WriteLine("No nodes specified to connect to.");
+            }
+
+            DatabaseNode node = new DatabaseNode(new Settings(port, nodes, enableWebInterface));
+            while (Console.ReadLine() != "exit")
+            {
+            }
+
+            Console.WriteLine("Shutting down...");
+            node.Shutdown();
         }
     }
 }

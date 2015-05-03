@@ -1,7 +1,5 @@
 ﻿using DatabaseV2.Networking;
-using System;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace DatabaseV2
 {
@@ -11,32 +9,31 @@ namespace DatabaseV2
     public class Settings
     {
         /// <summary>
-        /// Gets or sets the nodes to initially connect to.
+        /// Initializes a new instance of the <see cref="Settings"/> class.
         /// </summary>
-        public List<NodeDefinition> Nodes { get; set; }
-
-        /// <summary>
-        /// Gets or sets the port to run the database on.
-        /// </summary>
-        public int Port { get; set; }
-
-        /// <summary>
-        /// Parses a string into a list of nodes.
-        /// </summary>
-        /// <param name="nodeList">The string to parse.</param>
-        public void ParseNodeList(string nodeList)
+        /// <param name="port">The port to run the database on.</param>
+        /// <param name="nodes">The nodes to initially connect to.</param>
+        /// <param name="enableWebInterface">A value indicating whether the web interface should be enabled.</param>
+        public Settings(int port, List<NodeDefinition> nodes, bool enableWebInterface)
         {
-            List<NodeDefinition> nodes = new List<NodeDefinition>();
-            var parts = nodeList.Split(',');
-            try
-            {
-                nodes.AddRange(parts.Select(t => new NodeDefinition(t)));
-                Nodes = nodes;
-            }
-            catch (ArgumentException)
-            {
-                Console.WriteLine("Connection string is not in the right format.");
-            }
+            EnableWebInterface = enableWebInterface;
+            Port = port;
+            Nodes = nodes;
         }
+
+        /// <summary>
+        /// Gets a value indicating whether the web interface should be enabled.
+        /// </summary>
+        public bool EnableWebInterface { get; private set; }
+
+        /// <summary>
+        /// Gets the nodes to initially connect to.
+        /// </summary>
+        public List<NodeDefinition> Nodes { get; private set; }
+
+        /// <summary>
+        /// Gets the port to run the database on.
+        /// </summary>
+        public int Port { get; private set; }
     }
 }

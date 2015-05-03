@@ -99,17 +99,17 @@ namespace DatabaseV2.Networking
         }
 
         /// <summary>
+        /// Gets a value indicating whether the network is running.
+        /// </summary>
+        public bool Running { get; private set; }
+
+        /// <summary>
         /// Gets the port to listen for connections on.
         /// </summary>
         protected int Port
         {
             get { return _port; }
         }
-
-        /// <summary>
-        /// Gets a value indicating whether the network is running.
-        /// </summary>
-        protected bool Running { get; private set; }
 
         /// <summary>
         /// Gets a list of the connected nodes.
@@ -291,8 +291,17 @@ namespace DatabaseV2.Networking
         /// <param name="result">The result of the async call.</param>
         private void ProcessRequest(IAsyncResult result)
         {
-            var incoming = _listener.EndAcceptTcpClient(result);
-            _listener.BeginAcceptTcpClient(ProcessRequest, null);
+            TcpClient incoming;
+            try
+            {
+                incoming = _listener.EndAcceptTcpClient(result);
+                _listener.BeginAcceptTcpClient(ProcessRequest, null);
+            }
+            catch (ObjectDisposedException)
+            {
+                // The connection listener was shutdown, probably because we ourselves are shutting down.
+                return;
+            }
 
             Connection connection = new Connection(incoming);
 
