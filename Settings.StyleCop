@@ -6,6 +6,7 @@
     </CollectionProperty>
     <StringProperty Name="MergeSettingsFiles">NoMerge</StringProperty>
     <CollectionProperty Name="RecognizedWords">
+      <Value>json</Value>
       <Value>localhost</Value>
     </CollectionProperty>
   </GlobalSettings>

@@ -58,6 +58,72 @@ namespace DatabaseV2
         }
 
         /// <summary>
+        /// Generates the connections web page.
+        /// </summary>
+        /// <param name="queryString">The value of the query string.</param>
+        /// <returns>The html or json of the connections web page.</returns>
+        private string GenerateConnectionsPage(NameValueCollection queryString)
+        {
+            StringBuilder builder = new StringBuilder();
+            if (queryString["json"] == "true")
+            {
+                builder.Append("{\"connections\":[");
+                bool first = true;
+                foreach (var node in _network.GetConnectedNodes())
+                {
+                    if (!first)
+                    {
+                        builder.Append(",");
+                    }
+
+                    builder.Append("\"");
+                    builder.Append(node.ConnectionName);
+                    builder.Append("\"");
+                    first = false;
+                }
+
+                builder.Append("]}");
+            }
+            else
+            {
+                builder.Append("<html><body>");
+                builder.Append("<b>Connected Nodes:</b>");
+
+                foreach (var node in _network.GetConnectedNodes())
+                {
+                    builder.Append("<br/>");
+                    builder.Append(node.ConnectionName);
+                }
+
+                builder.Append("</body></html>");
+            }
+
+            return builder.ToString();
+        }
+
+        /// <summary>
+        /// Generates the main web page.
+        /// </summary>
+        /// <returns>The html for the main web page.</returns>
+        private string GenerateMainPage()
+        {
+            StringBuilder builder = new StringBuilder();
+            builder.Append("<html><body>");
+            builder.Append("<b>Predecessor:</b> ");
+            builder.Append(_network.Predecessor == null ? "null" : _network.Predecessor.ConnectionName);
+
+            builder.Append("<br/><br/><b>Finger Table:</b>");
+            foreach (var finger in _network.FingerTable)
+            {
+                builder.Append("<br/>");
+                builder.Append(finger == null ? "null" : finger.ConnectionName);
+            }
+
+            builder.Append("</body></html>");
+            return builder.ToString();
+        }
+
+        /// <summary>
         /// Generates a response for a web interface request.
         /// </summary>
         /// <param name="page">The page that was requested.</param>
@@ -65,23 +131,16 @@ namespace DatabaseV2
         /// <returns>The html response to the web interface request.</returns>
         private string GenerateWebResponse(string page, NameValueCollection queryString)
         {
-            StringBuilder builder = new StringBuilder();
-            builder.Append("<html><body>");
-            if (page == string.Empty)
+            switch (page)
             {
-                builder.Append("<b>Predecessor:</b> ");
-                builder.Append(_network.Predecessor == null ? "null" : _network.Predecessor.ConnectionName);
+                case "":
+                    return GenerateMainPage();
 
-                builder.Append("<br/><br/><b>Finger Table:</b>");
-                foreach (var finger in _network.FingerTable)
-                {
-                    builder.Append("<br/>");
-                    builder.Append(finger == null ? "null" : finger.ConnectionName);
-                }
+                case "connections":
+                    return GenerateConnectionsPage(queryString);
             }
 
-            builder.Append("</body></html>");
-            return builder.ToString();
+            return "<html><body>Page not found.</body></html>";
         }
 
         /// <summary>
