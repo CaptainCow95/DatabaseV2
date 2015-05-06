@@ -32,6 +32,10 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.6.0.8\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
     <Reference Include="SmartThreadPool, Version=2.2.3.0, Culture=neutral, PublicKeyToken=1126fe8b671e8a79, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\SmartThreadPool.dll</HintPath>
@@ -47,6 +51,10 @@
   <ItemGroup>
     <Compile Include="ByteArrayHelper.cs" />
     <Compile Include="DatabaseNode.cs" />
+    <Compile Include="DataTypeException.cs" />
+    <Compile Include="Document.cs" />
+    <Compile Include="DocumentEntry.cs" />
+    <Compile Include="DocumentEntryType.cs" />
     <Compile Include="Networking\ChordNetwork.cs" />
     <Compile Include="Networking\Connection.cs" />
     <Compile Include="Networking\ConnectionStatus.cs" />
@@ -69,6 +77,7 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
