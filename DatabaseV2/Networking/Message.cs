@@ -1,5 +1,4 @@
-﻿using DatabaseV2.Networking.Messaging;
-using System;
+﻿using System;
 using System.Threading;
 
 namespace DatabaseV2.Networking
@@ -34,6 +33,8 @@ namespace DatabaseV2.Networking
         /// </summary>
         private readonly uint _inResponseTo;
 
+        private readonly string _messageType;
+
         /// <summary>
         /// A value indicating whether the message is waiting for a response.
         /// </summary>
@@ -51,9 +52,10 @@ namespace DatabaseV2.Networking
         /// <param name="data">The data contained in the message.</param>
         /// <param name="waitingForResponse">A value indicating whether the message is waiting for a response.</param>
         /// <param name="timeout">The number of seconds before the message times out.</param>
-        public Message(NodeDefinition address, MessageData data, bool waitingForResponse, uint timeout = 60)
+        public Message(NodeDefinition address, string messageType, Document data, bool waitingForResponse, uint timeout = 60)
         {
             Address = address;
+            _messageType = messageType;
             Data = data;
             _id = GetNextId();
             _waitingForResponse = waitingForResponse;
@@ -69,8 +71,8 @@ namespace DatabaseV2.Networking
         /// <param name="data">The data contained in the message.</param>
         /// <param name="waitingForResponse">A value indicating whether the message is waiting for a response.</param>
         /// <param name="timeout">The number of seconds before the message times out.</param>
-        public Message(Message responseTo, MessageData data, bool waitingForResponse, uint timeout = 60)
-            : this(responseTo.Address, data, waitingForResponse, timeout)
+        public Message(Message responseTo, string messageType, Document data, bool waitingForResponse, uint timeout = 60)
+            : this(responseTo.Address, messageType, data, waitingForResponse, timeout)
         {
             _inResponseTo = responseTo._id;
             Type = responseTo.Type;
@@ -91,7 +93,8 @@ namespace DatabaseV2.Networking
             _id = ByteArrayHelper.ToUInt32(data, ref index);
             _inResponseTo = ByteArrayHelper.ToUInt32(data, ref index);
             _waitingForResponse = ByteArrayHelper.ToBoolean(data, ref index);
-            Data = MessageData.Decode(data, index);
+            _messageType = ByteArrayHelper.ToString(data, ref index);
+            Data = new Document(ByteArrayHelper.ToString(data, ref index));
 
             Status = MessageStatus.Received;
         }
@@ -104,7 +107,7 @@ namespace DatabaseV2.Networking
         /// <summary>
         /// Gets the data contained in the message.
         /// </summary>
-        public MessageData Data { get; private set; }
+        public Document Data { get; private set; }
 
         /// <summary>
         /// Gets the expire time of the message.
@@ -128,6 +131,11 @@ namespace DatabaseV2.Networking
         public uint InResponseTo
         {
             get { return _inResponseTo; }
+        }
+
+        public string MessageType
+        {
+            get { return _messageType; }
         }
 
         /// <summary>
@@ -195,10 +203,11 @@ namespace DatabaseV2.Networking
             byte[] idBytes = ByteArrayHelper.ToBytes(_id);
             byte[] inResponseToBytes = ByteArrayHelper.ToBytes(_inResponseTo);
             byte[] waitingForResponseBytes = ByteArrayHelper.ToBytes(_waitingForResponse);
-            byte[] data = Data.Encode();
-            int length = idBytes.Length + inResponseToBytes.Length + waitingForResponseBytes.Length + data.Length;
+            byte[] messageTypeBytes = ByteArrayHelper.ToBytes(_messageType);
+            byte[] data = ByteArrayHelper.ToBytes(Data.ToJson());
+            int length = idBytes.Length + inResponseToBytes.Length + waitingForResponseBytes.Length + messageTypeBytes.Length + data.Length;
 
-            return ByteArrayHelper.Combine(ByteArrayHelper.ToBytes(length), idBytes, inResponseToBytes, waitingForResponseBytes, data);
+            return ByteArrayHelper.Combine(ByteArrayHelper.ToBytes(length), idBytes, inResponseToBytes, waitingForResponseBytes, messageTypeBytes, data);
         }
 
         /// <summary>
