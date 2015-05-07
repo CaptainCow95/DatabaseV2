@@ -18,7 +18,7 @@ namespace DatabaseV2
             {
             }
 
-            Console.WriteLine("Shutting down...");
+            Logger.Log("Shutting down...", LogLevel.Info);
             node.Shutdown();
         }
     }

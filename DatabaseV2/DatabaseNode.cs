@@ -35,6 +35,7 @@ namespace DatabaseV2
         {
             _settings = settings;
 
+            Logger.Init(_settings.LogLocation, _settings.LogLevel);
             _network = new ChordNetwork(_settings.Port, _settings.Nodes);
 
             if (_settings.EnableWebInterface)
@@ -55,6 +56,8 @@ namespace DatabaseV2
             {
                 _webInterfaceThread.Join();
             }
+
+            Logger.Shutdown();
         }
 
         /// <summary>

@@ -1,7 +1,9 @@
 ﻿using DatabaseV2.Networking;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Reflection;
 
 namespace DatabaseV2
 {
@@ -17,7 +19,23 @@ namespace DatabaseV2
 @"--port <number>, -p <number>     Sets the port to the specified number.
 --nodes <string>, -n <string>    Sets the initial nodes to connect to.
 --enablewebinterface, -w         Enables the web interface.
+--loglocation, -l                Sets the log location.
 --help, -h                       Shows this help text.";
+
+        /// <summary>
+        /// The log level argument's error message.
+        /// </summary>
+        private const string LogLevelErrorMessage = " argument provided, but was not followed by a value.";
+
+        /// <summary>
+        /// The log level argument's invalid message.
+        /// </summary>
+        private const string LogLevelInvalidMessage = " argument provided, but was invalid. Valid options are 'debug', 'info', 'warning', and 'error'.";
+
+        /// <summary>
+        /// The log location argument's error message.
+        /// </summary>
+        private const string LogLocationErrorMessage = " argument provided, but was not followed by a value.";
 
         /// <summary>
         /// The nodes argument's error message.
@@ -50,17 +68,31 @@ namespace DatabaseV2
         /// <param name="port">The port to run the database on.</param>
         /// <param name="nodes">The nodes to initially connect to.</param>
         /// <param name="enableWebInterface">A value indicating whether the web interface should be enabled.</param>
-        private Settings(int port, List<NodeDefinition> nodes, bool enableWebInterface)
+        /// <param name="logLocation">The location to log to.</param>
+        /// <param name="logLevel">The minimum log level to log messages.</param>
+        private Settings(int port, List<NodeDefinition> nodes, bool enableWebInterface, string logLocation, LogLevel logLevel)
         {
-            EnableWebInterface = enableWebInterface;
             Port = port;
             Nodes = nodes;
+            EnableWebInterface = enableWebInterface;
+            LogLocation = logLocation;
+            LogLevel = logLevel;
         }
 
         /// <summary>
         /// Gets a value indicating whether the web interface should be enabled.
         /// </summary>
         public bool EnableWebInterface { get; private set; }
+
+        /// <summary>
+        /// Gets the minimum log level to log.
+        /// </summary>
+        public LogLevel LogLevel { get; private set; }
+
+        /// <summary>
+        /// Gets the location to log to.
+        /// </summary>
+        public string LogLocation { get; private set; }
 
         /// <summary>
         /// Gets the nodes to initially connect to.
@@ -79,7 +111,7 @@ namespace DatabaseV2
         /// <returns>The settings retrieved from the command line arguments.</returns>
         public static Settings ReadCommandLineArguments(string[] args)
         {
-            Settings settings = new Settings(-1, new List<NodeDefinition>(), false);
+            Settings settings = new Settings(-1, new List<NodeDefinition>(), false, Path.GetDirectoryName(Assembly.GetEntryAssembly().Location), LogLevel.Warning);
             for (int i = 0; i < args.Length; ++i)
             {
                 string arg = ReadArgument(args, i, string.Empty).ToLowerInvariant();
@@ -92,7 +124,7 @@ namespace DatabaseV2
                         {
                             if (port < 1 || port > 65535)
                             {
-                                Console.WriteLine(arg + PortInvalidMessage);
+                                Logger.Log(arg + PortInvalidMessage, LogLevel.Warning);
                             }
                             else
                             {
@@ -112,7 +144,7 @@ namespace DatabaseV2
                         catch (ArgumentException)
                         {
                             settings.Nodes.Clear();
-                            Console.WriteLine(NodesInvalidMessage);
+                            Logger.Log(NodesInvalidMessage, LogLevel.Warning);
                         }
 
                         break;
@@ -120,6 +152,44 @@ namespace DatabaseV2
                     case "--enablewebinterface":
                     case "-w":
                         settings.EnableWebInterface = true;
+                        break;
+
+                    case "--loglocation":
+                    case "-l":
+                        string logLocation = ReadArgument(args, ++i, arg + LogLocationErrorMessage);
+                        if (logLocation != string.Empty)
+                        {
+                            settings.LogLocation = logLocation;
+                        }
+
+                        break;
+
+                    case "--loglevel":
+                        string logLevel = ReadArgument(args, ++i, arg + LogLevelErrorMessage).ToLower();
+                        if (logLevel != string.Empty)
+                        {
+                            if (logLevel == "debug")
+                            {
+                                settings.LogLevel = LogLevel.Debug;
+                            }
+                            else if (logLevel == "info")
+                            {
+                                settings.LogLevel = LogLevel.Info;
+                            }
+                            else if (logLevel == "warning")
+                            {
+                                settings.LogLevel = LogLevel.Warning;
+                            }
+                            else if (logLevel == "error")
+                            {
+                                settings.LogLevel = LogLevel.Error;
+                            }
+                            else
+                            {
+                                Logger.Log(arg + LogLevelInvalidMessage, LogLevel.Warning);
+                            }
+                        }
+
                         break;
 
                     case "--help":
@@ -131,13 +201,13 @@ namespace DatabaseV2
 
             if (settings.Port == -1)
             {
-                Console.WriteLine("No port given, defaulting to 5000");
+                Logger.Log("No port given, defaulting to 5000", LogLevel.Warning);
                 settings.Port = 5000;
             }
 
             if (settings.Nodes.Count == 0)
             {
-                Console.WriteLine("No nodes specified to connect to.");
+                Logger.Log("No nodes specified to connect to.", LogLevel.Warning);
             }
 
             return settings;
@@ -154,7 +224,7 @@ namespace DatabaseV2
         {
             if (index >= args.Length)
             {
-                Console.WriteLine(errorMessage);
+                Logger.Log(errorMessage, LogLevel.Warning);
                 return string.Empty;
             }
 
@@ -180,7 +250,7 @@ namespace DatabaseV2
             int retValue;
             if (!int.TryParse(arg, out retValue))
             {
-                Console.WriteLine(conversionErrorMessage);
+                Logger.Log(conversionErrorMessage, LogLevel.Warning);
             }
 
             return retValue;

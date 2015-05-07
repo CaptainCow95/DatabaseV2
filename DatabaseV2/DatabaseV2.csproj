@@ -55,6 +55,8 @@
     <Compile Include="Document.cs" />
     <Compile Include="DocumentEntry.cs" />
     <Compile Include="DocumentEntryType.cs" />
+    <Compile Include="Logger.cs" />
+    <Compile Include="LogLevel.cs" />
     <Compile Include="Networking\ChordNetwork.cs" />
     <Compile Include="Networking\Connection.cs" />
     <Compile Include="Networking\ConnectionStatus.cs" />
