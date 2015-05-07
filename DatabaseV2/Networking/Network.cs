@@ -1,5 +1,4 @@
 ﻿using Amib.Threading;
-using DatabaseV2.Networking.Messaging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,6 +17,11 @@ namespace DatabaseV2.Networking
         /// The connection cleaner thread.
         /// </summary>
         private readonly Thread _cleanerThread;
+
+        /// <summary>
+        /// The heartbeat thread.
+        /// </summary>
+        private readonly Thread _heartbeatThread;
 
         /// <summary>
         /// The incoming connection.
@@ -93,6 +97,9 @@ namespace DatabaseV2.Networking
             _cleanerThread = new Thread(RunCleaner);
             _cleanerThread.Start();
 
+            _heartbeatThread = new Thread(RunHeartbeat);
+            _heartbeatThread.Start();
+
             _listener = new TcpListener(IPAddress.Any, port);
             _listener.Start();
             _listener.BeginAcceptTcpClient(ProcessRequest, null);
@@ -127,6 +134,7 @@ namespace DatabaseV2.Networking
         {
             Running = false;
             _listener.Stop();
+            _heartbeatThread.Join();
             _messageReceivingThread.Join();
             _cleanerThread.Join();
             _messageReceivedPool.Shutdown();
@@ -148,7 +156,9 @@ namespace DatabaseV2.Networking
             }
 
             _outgoingConnectionsLock.ExitReadLock();
-            var message = new Message(definition, new JoinRequest(_port), true)
+            Document messageData = new Document();
+            messageData["Address"] = new DocumentEntry("Address", new NodeDefinition("localhost", _port).ConnectionName, DocumentEntryType.String);
+            var message = new Message(definition, "JoinRequest", messageData, true)
             {
                 RequireSecureConnection = false
             };
@@ -230,19 +240,24 @@ namespace DatabaseV2.Networking
         /// <param name="message">The message to process.</param>
         private void MessageReceivedHandler(Message message)
         {
-            if (message.Data is JoinRequest)
+            if (message.MessageType == "JoinRequest")
             {
-                JoinRequest request = (JoinRequest)message.Data;
-                RenameConnection(message.Address, request.Address);
+                var data = message.Data;
+                var dataAddress = new NodeDefinition(data["Address"].ValueAsString);
+                RenameConnection(message.Address, dataAddress);
                 _incomingConnectionsLock.EnterReadLock();
-                _incomingConnections[request.Address].ConnectionEstablished();
+                _incomingConnections[dataAddress].ConnectionEstablished();
                 _incomingConnectionsLock.ExitReadLock();
-                Message response = new Message(message, new JoinResult(), false)
+                Message response = new Message(message, "JoinResult", new Document(), false)
                 {
-                    Address = request.Address
+                    Address = dataAddress
                 };
 
                 SendMessage(response);
+            }
+            else if (message.MessageType == "Heartbeat")
+            {
+                SendMessage(new Message(message, "HeartbeatResponse", new Document(), false));
             }
             else
             {
@@ -495,6 +510,42 @@ namespace DatabaseV2.Networking
         }
 
         /// <summary>
+        /// Runs the heartbeat thread.
+        /// </summary>
+        private void RunHeartbeat()
+        {
+            while (Running)
+            {
+                Thread.Sleep(5000);
+
+                List<Message> messages = new List<Message>();
+                _outgoingConnectionsLock.EnterReadLock();
+
+                foreach (var conn in _outgoingConnections)
+                {
+                    Message message = new Message(conn.Key, "Heartbeat", new Document(), true);
+                    messages.Add(message);
+                    SendMessage(message);
+                }
+
+                _outgoingConnectionsLock.ExitReadLock();
+
+                _incomingConnectionsLock.EnterReadLock();
+
+                foreach (var conn in _incomingConnections)
+                {
+                    Message message = new Message(conn.Key, "Heartbeat", new Document(), true);
+                    messages.Add(message);
+                    SendMessage(message);
+                }
+
+                _incomingConnectionsLock.ExitReadLock();
+
+                messages.ForEach(e => e.BlockUntilDone());
+            }
+        }
+
+        /// <summary>
         /// Sends a message to a node.
         /// </summary>
         /// <param name="message">The message to send.</param>
@@ -533,7 +584,7 @@ namespace DatabaseV2.Networking
                     Monitor.Exit(_waitingForResponses);
                 }
             }
-            else if (!connections.ContainsKey(message.Address))
+            else
             {
                 message.Status = MessageStatus.SendingFailure;
 

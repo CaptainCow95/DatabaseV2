@@ -33,6 +33,9 @@ namespace DatabaseV2.Networking
         /// </summary>
         private readonly uint _inResponseTo;
 
+        /// <summary>
+        /// The type of the message.
+        /// </summary>
         private readonly string _messageType;
 
         /// <summary>
@@ -49,6 +52,7 @@ namespace DatabaseV2.Networking
         /// Initializes a new instance of the <see cref="Message"/> class.
         /// </summary>
         /// <param name="address">The address to send the message to.</param>
+        /// <param name="messageType">The type of the message.</param>
         /// <param name="data">The data contained in the message.</param>
         /// <param name="waitingForResponse">A value indicating whether the message is waiting for a response.</param>
         /// <param name="timeout">The number of seconds before the message times out.</param>
@@ -68,6 +72,7 @@ namespace DatabaseV2.Networking
         /// Initializes a new instance of the <see cref="Message"/> class.
         /// </summary>
         /// <param name="responseTo">The message that this message is in response to.</param>
+        /// <param name="messageType">The type of the message.</param>
         /// <param name="data">The data contained in the message.</param>
         /// <param name="waitingForResponse">A value indicating whether the message is waiting for a response.</param>
         /// <param name="timeout">The number of seconds before the message times out.</param>
@@ -133,6 +138,9 @@ namespace DatabaseV2.Networking
             get { return _inResponseTo; }
         }
 
+        /// <summary>
+        /// Gets the message type.
+        /// </summary>
         public string MessageType
         {
             get { return _messageType; }

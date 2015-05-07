@@ -135,15 +135,15 @@ namespace DatabaseV2
         }
 
         /// <summary>
-        /// Gets the value as a float.
+        /// Gets the value as a double.
         /// </summary>
-        public float ValueAsFloat
+        public double ValueAsDouble
         {
             get
             {
-                if (_valueType == DocumentEntryType.Float)
+                if (_valueType == DocumentEntryType.Double)
                 {
-                    return Convert.ToSingle(_value);
+                    return Convert.ToDouble(_value);
                 }
 
                 throw new DataTypeException(_value.GetType(), typeof(float));
@@ -151,15 +151,15 @@ namespace DatabaseV2
         }
 
         /// <summary>
-        /// Gets the value as an integer.
+        /// Gets the value as an 64-bit integer.
         /// </summary>
-        public int ValueAsInteger
+        public long ValueAsInt64
         {
             get
             {
-                if (_valueType == DocumentEntryType.Integer)
+                if (_valueType == DocumentEntryType.Int64)
                 {
-                    return Convert.ToInt32(_value);
+                    return Convert.ToInt64(_value);
                 }
 
                 throw new DataTypeException(_value.GetType(), typeof(int));
@@ -260,11 +260,11 @@ namespace DatabaseV2
                     break;
 
                 case JsonToken.Float:
-                    type = DocumentEntryType.Float;
+                    type = DocumentEntryType.Double;
                     break;
 
                 case JsonToken.Integer:
-                    type = DocumentEntryType.Integer;
+                    type = DocumentEntryType.Int64;
                     break;
 
                 case JsonToken.String:

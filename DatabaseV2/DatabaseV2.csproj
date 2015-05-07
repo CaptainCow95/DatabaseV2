@@ -61,14 +61,6 @@
     <Compile Include="Networking\ConnectionType.cs" />
     <Compile Include="Networking\Message.cs" />
     <Compile Include="Networking\MessageStatus.cs" />
-    <Compile Include="Networking\Messaging\ChordNotify.cs" />
-    <Compile Include="Networking\Messaging\ChordPredecessorRequest.cs" />
-    <Compile Include="Networking\Messaging\ChordPredecessorResponse.cs" />
-    <Compile Include="Networking\Messaging\ChordSuccessorRequest.cs" />
-    <Compile Include="Networking\Messaging\ChordSuccessorResponse.cs" />
-    <Compile Include="Networking\Messaging\JoinRequest.cs" />
-    <Compile Include="Networking\Messaging\JoinResult.cs" />
-    <Compile Include="Networking\Messaging\MessageData.cs" />
     <Compile Include="Networking\Network.cs" />
     <Compile Include="Networking\NodeDefinition.cs" />
     <Compile Include="Program.cs" />

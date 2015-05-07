@@ -65,9 +65,7 @@ namespace DatabaseV2.Networking
                     if (message.Success && message.Response.MessageType == "ChordSuccessorResponse")
                     {
                         var data = message.Response.Data;
-
-                        // TODO: Find a way to make this an actual uint.
-                        _fingerTable[0] = new ChordNode(new NodeDefinition(data["Successor"].ValueAsString), (uint)data["ChordId"].ValueAsInteger);
+                        _fingerTable[0] = new ChordNode(new NodeDefinition(data["Successor"].ValueAsString), (uint)data["ChordId"].ValueAsInt64);
                         if (!Equals(_fingerTable[0], _self) && !Connect(_fingerTable[0].Node))
                         {
                             _fingerTable[0] = _self;
@@ -112,19 +110,19 @@ namespace DatabaseV2.Networking
         {
             _chordLock.EnterWriteLock();
 
-            if (Equals(_predecessor.Node, node))
+            if (_predecessor != null && Equals(_predecessor.Node, node))
             {
                 _predecessor = null;
             }
 
-            if (Equals(_fingerTable[0].Node, node))
+            if (_fingerTable[0] != null && Equals(_fingerTable[0].Node, node))
             {
                 _fingerTable[0] = _self;
             }
 
             for (int i = 1; i < 32; ++i)
             {
-                if (Equals(_fingerTable[i].Node, node))
+                if (_fingerTable[i] != null && Equals(_fingerTable[i].Node, node))
                 {
                     _fingerTable[i] = null;
                 }
@@ -141,9 +139,7 @@ namespace DatabaseV2.Networking
                 _chordLock.EnterReadLock();
                 Document responseData = new Document();
                 responseData["Successor"] = new DocumentEntry("Successor", _fingerTable[0].Node.ConnectionName, DocumentEntryType.String);
-
-                // TODO: Find a way to make this an actual uint.
-                responseData["ChordId"] = new DocumentEntry("ChordId", _fingerTable[0].ChordId, DocumentEntryType.Integer);
+                responseData["ChordId"] = new DocumentEntry("ChordId", _fingerTable[0].ChordId, DocumentEntryType.Int64);
                 Message response = new Message(message, "ChordSuccessorResponse", responseData, false);
                 SendMessage(response);
                 _chordLock.ExitReadLock();
@@ -153,9 +149,7 @@ namespace DatabaseV2.Networking
                 _chordLock.EnterReadLock();
                 Document responseData = new Document();
                 responseData["Predecessor"] = new DocumentEntry("Predecessor", _predecessor == null ? ":0" : _predecessor.Node.ConnectionName, DocumentEntryType.String);
-
-                // TODO: Find a way to make this an actual uint.
-                responseData["ChordId"] = new DocumentEntry("ChordId", _predecessor == null ? 0 : _predecessor.ChordId, DocumentEntryType.Integer);
+                responseData["ChordId"] = new DocumentEntry("ChordId", _predecessor == null ? 0 : _predecessor.ChordId, DocumentEntryType.Int64);
                 Message response = new Message(message, "ChordPredecessorResponse", responseData, false);
                 SendMessage(response);
                 _chordLock.ExitReadLock();
@@ -165,12 +159,9 @@ namespace DatabaseV2.Networking
                 _chordLock.EnterWriteLock();
 
                 var data = message.Data;
-
-                // TODO: Find a way to make this an actual uint.
-                if (_predecessor == null || IsBetween((uint)data["ChordId"].ValueAsInteger, _predecessor.ChordId, _self.ChordId))
+                if (_predecessor == null || IsBetween((uint)data["ChordId"].ValueAsInt64, _predecessor.ChordId, _self.ChordId))
                 {
-                    // TODO: Find a way to make this an actual uint.
-                    _predecessor = new ChordNode(new NodeDefinition(data["Node"].ValueAsString), (uint)data["ChordId"].ValueAsInteger);
+                    _predecessor = new ChordNode(new NodeDefinition(data["Node"].ValueAsString), (uint)data["ChordId"].ValueAsInt64);
                     if (!Connect(_predecessor.Node))
                     {
                         _predecessor = null;
@@ -239,8 +230,7 @@ namespace DatabaseV2.Networking
 
             var data = message.Response.Data;
 
-            // TODO: Find a way to make this an actual uint.
-            return new ChordNode(new NodeDefinition(data["Successor"].ValueAsString), (uint)data["ChordId"].ValueAsInteger);
+            return new ChordNode(new NodeDefinition(data["Successor"].ValueAsString), (uint)data["ChordId"].ValueAsInt64);
         }
 
         /// <summary>
@@ -285,9 +275,7 @@ namespace DatabaseV2.Networking
                     }
 
                     var data = message.Response.Data;
-
-                    // TODO: Find a way to make this an actual uint.
-                    predecessor = new ChordNode(new NodeDefinition(data["Predecessor"].ValueAsString), (uint)data["ChordId"].ValueAsInteger);
+                    predecessor = new ChordNode(new NodeDefinition(data["Predecessor"].ValueAsString), (uint)data["ChordId"].ValueAsInt64);
                 }
                 else
                 {
@@ -314,9 +302,7 @@ namespace DatabaseV2.Networking
                 {
                     Document responseData = new Document();
                     responseData["Node"] = new DocumentEntry("Node", _self.Node.ConnectionName, DocumentEntryType.String);
-
-                    // TODO: Find a way to make this an actual uint.
-                    responseData["ChordId"] = new DocumentEntry("ChordId", _self.ChordId, DocumentEntryType.Integer);
+                    responseData["ChordId"] = new DocumentEntry("ChordId", _self.ChordId, DocumentEntryType.Int64);
                     message = new Message(_fingerTable[0].Node, "ChordNotify", responseData, false);
                     SendMessage(message);
                 }

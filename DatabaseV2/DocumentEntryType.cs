@@ -16,14 +16,14 @@
         Boolean,
 
         /// <summary>
-        /// An entry that is a float.
+        /// An entry that is a double.
         /// </summary>
-        Float,
+        Double,
 
         /// <summary>
-        /// An entry that is an integer.
+        /// An entry that is a 64-bit integer.
         /// </summary>
-        Integer,
+        Int64,
 
         /// <summary>
         /// An entry that is an embedded document.
