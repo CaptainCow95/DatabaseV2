@@ -1,4 +1,4 @@
-﻿namespace DatabaseV2
+﻿namespace Library.Data
 {
     /// <summary>
     /// Represents the different types of document entries.

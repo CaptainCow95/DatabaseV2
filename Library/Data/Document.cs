@@ -5,7 +5,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 
-namespace DatabaseV2
+namespace Library.Data
 {
     /// <summary>
     /// Represents a json document.

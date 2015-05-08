@@ -1,4 +1,6 @@
-﻿using System;
+﻿using Library.Data;
+using Library.Networking;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -106,7 +108,7 @@ namespace DatabaseV2.Networking
         }
 
         /// <inheritdoc />
-        protected override void Disconnection(NodeDefinition node)
+        protected override void HandleDisconnection(NodeDefinition node)
         {
             _chordLock.EnterWriteLock();
 
@@ -132,7 +134,7 @@ namespace DatabaseV2.Networking
         }
 
         /// <inheritdoc />
-        protected override void HandleMessage(Message message)
+        protected override bool HandleMessage(Message message)
         {
             if (message.MessageType == "ChordSuccessorRequest")
             {
@@ -143,8 +145,10 @@ namespace DatabaseV2.Networking
                 Message response = new Message(message, "ChordSuccessorResponse", responseData, false);
                 SendMessage(response);
                 _chordLock.ExitReadLock();
+                return true;
             }
-            else if (message.MessageType == "ChordPredecessorRequest")
+
+            if (message.MessageType == "ChordPredecessorRequest")
             {
                 _chordLock.EnterReadLock();
                 Document responseData = new Document();
@@ -153,8 +157,10 @@ namespace DatabaseV2.Networking
                 Message response = new Message(message, "ChordPredecessorResponse", responseData, false);
                 SendMessage(response);
                 _chordLock.ExitReadLock();
+                return true;
             }
-            else if (message.MessageType == "ChordNotify")
+
+            if (message.MessageType == "ChordNotify")
             {
                 _chordLock.EnterWriteLock();
 
@@ -169,7 +175,10 @@ namespace DatabaseV2.Networking
                 }
 
                 _chordLock.ExitWriteLock();
+                return true;
             }
+
+            return base.HandleMessage(message);
         }
 
         /// <summary>

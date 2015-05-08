@@ -2,7 +2,7 @@
 using System;
 using System.Collections.Generic;
 
-namespace DatabaseV2
+namespace Library.Data
 {
     /// <summary>
     /// Represents an entry in a document.

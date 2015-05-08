@@ -1,4 +1,5 @@
 ﻿using Amib.Threading;
+using Library.Data;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -6,12 +7,12 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 
-namespace DatabaseV2.Networking
+namespace Library.Networking
 {
     /// <summary>
     /// Handles network connections.
     /// </summary>
-    public abstract class Network
+    public class Network
     {
         /// <summary>
         /// The connection cleaner thread.
@@ -81,12 +82,9 @@ namespace DatabaseV2.Networking
         /// <summary>
         /// Initializes a new instance of the <see cref="Network"/> class.
         /// </summary>
-        /// <param name="port">The port to listen for connections on.</param>
-        protected Network(int port)
+        public Network()
         {
             Running = true;
-
-            _port = port;
 
             _messageSendPool.Start();
             _messageReceivedPool.Start();
@@ -99,11 +97,31 @@ namespace DatabaseV2.Networking
 
             _heartbeatThread = new Thread(RunHeartbeat);
             _heartbeatThread.Start();
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Network"/> class.
+        /// </summary>
+        /// <param name="port">The port to listen for connections on.</param>
+        protected Network(int port)
+            : this()
+        {
+            _port = port;
 
             _listener = new TcpListener(IPAddress.Any, port);
             _listener.Start();
             _listener.BeginAcceptTcpClient(ProcessRequest, null);
         }
+
+        /// <summary>
+        /// An event called when a node is disconnected.
+        /// </summary>
+        public event EventHandler<DisconnectionEventArgs> Disconnection;
+
+        /// <summary>
+        /// An event called when a new message is received.
+        /// </summary>
+        public event EventHandler<MessageReceivedEventArgs> MessageReceived;
 
         /// <summary>
         /// Gets a value indicating whether the network is running.
@@ -119,34 +137,11 @@ namespace DatabaseV2.Networking
         }
 
         /// <summary>
-        /// Gets a list of the connected nodes.
-        /// </summary>
-        /// <returns>A list of the connected nodes.</returns>
-        public IEnumerable<NodeDefinition> GetConnectedNodes()
-        {
-            return _outgoingConnections.Select(e => e.Key);
-        }
-
-        /// <summary>
-        /// Shuts down the network.
-        /// </summary>
-        public virtual void Shutdown()
-        {
-            Running = false;
-            _listener.Stop();
-            _heartbeatThread.Join();
-            _messageReceivingThread.Join();
-            _cleanerThread.Join();
-            _messageReceivedPool.Shutdown();
-            _messageSendPool.Shutdown();
-        }
-
-        /// <summary>
         /// Connects to the specified node.
         /// </summary>
         /// <param name="definition">The node to connect to.</param>
         /// <returns>True if the connection was established, otherwise false.</returns>
-        protected bool Connect(NodeDefinition definition)
+        public bool Connect(NodeDefinition definition)
         {
             _outgoingConnectionsLock.EnterReadLock();
             if (_outgoingConnections.ContainsKey(definition) && _outgoingConnections[definition].Status != ConnectionStatus.Disconnected)
@@ -177,26 +172,81 @@ namespace DatabaseV2.Networking
         }
 
         /// <summary>
-        /// Called when a node is disconnected.
+        /// Gets a list of the connected nodes.
         /// </summary>
-        /// <param name="node">The node that got disconnected.</param>
-        protected abstract void Disconnection(NodeDefinition node);
+        /// <returns>A list of the connected nodes.</returns>
+        public IEnumerable<NodeDefinition> GetConnectedNodes()
+        {
+            return _outgoingConnections.Select(e => e.Key);
+        }
 
         /// <summary>
-        /// Handles a message.
+        /// Checks if the network is connected to a node.
         /// </summary>
-        /// <param name="message">The message that was received.</param>
-        protected abstract void HandleMessage(Message message);
+        /// <param name="node">The node the check for.</param>
+        /// <returns>True if the node was found, otherwise false.</returns>
+        public bool IsConnected(NodeDefinition node)
+        {
+            bool found = false;
+            _outgoingConnectionsLock.EnterReadLock();
+            found = _outgoingConnections.ContainsKey(node) && _outgoingConnections[node].Status == ConnectionStatus.Connected;
+            _outgoingConnectionsLock.ExitReadLock();
+
+            if (!found)
+            {
+                _incomingConnectionsLock.EnterReadLock();
+                found = _incomingConnections.ContainsKey(node) && _incomingConnections[node].Status == ConnectionStatus.Connected;
+                _incomingConnectionsLock.ExitReadLock();
+            }
+
+            return found;
+        }
 
         /// <summary>
         /// Sends a message.
         /// </summary>
         /// <param name="message">The message to send.</param>
         /// <remarks>Queues the sending function onto the thread pool.</remarks>
-        protected void SendMessage(Message message)
+        public void SendMessage(Message message)
         {
             message.Status = MessageStatus.Sending;
             _messageSendPool.QueueWorkItem(SendMessageWorkItem, message);
+        }
+
+        /// <summary>
+        /// Shuts down the network.
+        /// </summary>
+        public virtual void Shutdown()
+        {
+            Running = false;
+            if (_listener != null)
+            {
+                _listener.Stop();
+            }
+
+            _heartbeatThread.Join();
+            _messageReceivingThread.Join();
+            _cleanerThread.Join();
+            _messageReceivedPool.Shutdown();
+            _messageSendPool.Shutdown();
+        }
+
+        /// <summary>
+        /// Called when a node is disconnected.
+        /// </summary>
+        /// <param name="node">The node that got disconnected.</param>
+        protected virtual void HandleDisconnection(NodeDefinition node)
+        {
+        }
+
+        /// <summary>
+        /// Handles a message.
+        /// </summary>
+        /// <param name="message">The message that was received.</param>
+        /// <returns>A value indicating whether the message has been handled.</returns>
+        protected virtual bool HandleMessage(Message message)
+        {
+            return false;
         }
 
         /// <summary>
@@ -204,7 +254,8 @@ namespace DatabaseV2.Networking
         /// </summary>
         /// <param name="connectionsLock">The connections lock.</param>
         /// <param name="connections">The connection list.</param>
-        private void CleanConnections(ReaderWriterLockSlim connectionsLock, Dictionary<NodeDefinition, Connection> connections)
+        /// <param name="type">The type of the connection.</param>
+        private void CleanConnections(ReaderWriterLockSlim connectionsLock, Dictionary<NodeDefinition, Connection> connections, ConnectionType type)
         {
             connectionsLock.EnterWriteLock();
             List<NodeDefinition> removedConnections = new List<NodeDefinition>();
@@ -213,8 +264,15 @@ namespace DatabaseV2.Networking
             removedConnections.ForEach(e => connections.Remove(e));
             connectionsLock.ExitWriteLock();
 
-            removedConnections.ForEach(e => _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(e, ConnectionType.Outgoing)));
-            removedConnections.ForEach(Disconnection);
+            foreach (var item in removedConnections)
+            {
+                _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(item, type));
+                HandleDisconnection(item);
+                if (Disconnection != null)
+                {
+                    Disconnection(this, new DisconnectionEventArgs(item));
+                }
+            }
 
             Monitor.Enter(_waitingForResponses);
             List<uint> removedMessages = new List<uint>();
@@ -261,7 +319,10 @@ namespace DatabaseV2.Networking
             }
             else
             {
-                HandleMessage(message);
+                if (!HandleMessage(message) && MessageReceived != null)
+                {
+                    MessageReceived(this, new MessageReceivedEventArgs(message));
+                }
             }
         }
 
@@ -486,8 +547,8 @@ namespace DatabaseV2.Networking
 
                 Monitor.Enter(_messagesReceived);
 
-                CleanConnections(_outgoingConnectionsLock, _outgoingConnections);
-                CleanConnections(_incomingConnectionsLock, _incomingConnections);
+                CleanConnections(_outgoingConnectionsLock, _outgoingConnections, ConnectionType.Outgoing);
+                CleanConnections(_incomingConnectionsLock, _incomingConnections, ConnectionType.Incoming);
 
                 Monitor.Exit(_messagesReceived);
 

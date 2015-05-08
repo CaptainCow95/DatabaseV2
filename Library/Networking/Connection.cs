@@ -1,6 +1,6 @@
 ﻿using System.Net.Sockets;
 
-namespace DatabaseV2.Networking
+namespace Library.Networking
 {
     /// <summary>
     /// Represents a network connection to another node.

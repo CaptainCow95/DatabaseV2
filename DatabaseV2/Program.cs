@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Library.Logging;
+using System;
 
 namespace DatabaseV2
 {

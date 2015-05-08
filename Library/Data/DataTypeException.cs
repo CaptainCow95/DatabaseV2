@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DatabaseV2
+namespace Library.Data
 {
     /// <summary>
     /// Thrown when trying to get a data type out of a <see cref="DocumentEntry"/> and the data type requested does not match the actual data type.

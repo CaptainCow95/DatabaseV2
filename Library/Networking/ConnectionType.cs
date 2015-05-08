@@ -1,4 +1,4 @@
-﻿namespace DatabaseV2.Networking
+﻿namespace Library.Networking
 {
     /// <summary>
     /// Represents the type of the connection.

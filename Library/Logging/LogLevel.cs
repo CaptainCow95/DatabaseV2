@@ -1,4 +1,4 @@
-﻿namespace DatabaseV2
+﻿namespace Library.Logging
 {
     /// <summary>
     /// Represents the different logging levels.

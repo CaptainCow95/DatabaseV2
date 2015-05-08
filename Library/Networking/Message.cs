@@ -1,7 +1,8 @@
-﻿using System;
+﻿using Library.Data;
+using System;
 using System.Threading;
 
-namespace DatabaseV2.Networking
+namespace Library.Networking
 {
     /// <summary>
     /// Represents a network message.

@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using System.Threading;
 
-namespace DatabaseV2
+namespace Library.Logging
 {
     /// <summary>
     /// A object to log messages to a file and the console.

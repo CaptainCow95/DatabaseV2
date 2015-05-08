@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Net;
 
-namespace DatabaseV2.Networking
+namespace Library.Networking
 {
     /// <summary>
     /// Represents the definition of a node.
