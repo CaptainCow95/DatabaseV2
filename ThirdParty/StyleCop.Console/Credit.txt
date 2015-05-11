@@ -1,0 +1,1 @@
+This program is from https://github.com/Nylle/StyleCop.Console
