@@ -9,7 +9,7 @@ configuration:
 
 install:
   - ps: (new-object net.webclient).DownloadFile('https://stylecop.codeplex.com/downloads/get/323236', 'StyleCopInstaller.msi')
-  - ps: msiexec /i StyleCopInstaller.msi /quiet /qn /norestart /log install.log
+  - ps: Start-Process .\StyleCopInstaller.msi /quiet -Wait
 
 before_build:
   - nuget restore
