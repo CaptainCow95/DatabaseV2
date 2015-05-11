@@ -11,7 +11,7 @@ namespace DatabaseV2
     /// <summary>
     /// Represents a node in the database.
     /// </summary>
-    public class DatabaseNode
+    public class DatabaseNode : IDisposable
     {
         /// <summary>
         /// The chord network to use as a backend.
@@ -27,6 +27,16 @@ namespace DatabaseV2
         /// The thread to run the web interface on.
         /// </summary>
         private readonly Thread _webInterfaceThread;
+
+        /// <summary>
+        /// A value indicating whether the object has already been _disposed.
+        /// </summary>
+        private bool _disposed = false;
+
+        /// <summary>
+        /// The listener for incoming web interface connections.
+        /// </summary>
+        private HttpListener _listener;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DatabaseNode"/> class.
@@ -47,6 +57,14 @@ namespace DatabaseV2
         }
 
         /// <summary>
+        /// Releases all resources used by the current instance of the <see cref="DatabaseNode"/> class.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+
+        /// <summary>
         /// Shuts down the node.
         /// </summary>
         public void Shutdown()
@@ -59,6 +77,23 @@ namespace DatabaseV2
             }
 
             Logger.Shutdown();
+        }
+
+        /// <summary>
+        /// Releases all resources used by the current instance of the <see cref="DatabaseNode"/> class.
+        /// </summary>
+        /// <param name="disposing">Whether to dispose of managed resources or not.</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _network.Dispose();
+                    ((IDisposable)_listener).Dispose();
+                    _disposed = true;
+                }
+            }
         }
 
         /// <summary>
@@ -153,13 +188,12 @@ namespace DatabaseV2
         /// <param name="result">The listener the request came from.</param>
         private void ProcessWebRequest(IAsyncResult result)
         {
-            var listener = (HttpListener)result.AsyncState;
             HttpListenerContext context;
-            lock (_webInterfaceThread)
+            lock (_listener)
             {
-                if (listener.IsListening)
+                if (_listener.IsListening)
                 {
-                    context = listener.EndGetContext(result);
+                    context = _listener.EndGetContext(result);
                 }
                 else
                 {
@@ -185,11 +219,11 @@ namespace DatabaseV2
 
             NameValueCollection queryString = context.Request.QueryString;
 
-            lock (_webInterfaceThread)
+            lock (_listener)
             {
-                if (listener.IsListening)
+                if (_listener.IsListening)
                 {
-                    listener.BeginGetContext(ProcessWebRequest, listener);
+                    _listener.BeginGetContext(ProcessWebRequest, _listener);
                 }
             }
 
@@ -213,29 +247,28 @@ namespace DatabaseV2
         /// </summary>
         private void RunWebInterface()
         {
-            HttpListener listener;
             try
             {
-                listener = new HttpListener();
-                listener.Prefixes.Add("http://*:" + (_settings.Port + 1) + "/");
-                listener.Start();
+                _listener = new HttpListener();
+                _listener.Prefixes.Add("http://*:" + (_settings.Port + 1) + "/");
+                _listener.Start();
             }
             catch (HttpListenerException)
             {
-                listener = new HttpListener();
-                listener.Prefixes.Add("http://localhost:" + (_settings.Port + 1) + "/");
-                listener.Start();
+                _listener = new HttpListener();
+                _listener.Prefixes.Add("http://localhost:" + (_settings.Port + 1) + "/");
+                _listener.Start();
             }
 
-            listener.BeginGetContext(ProcessWebRequest, listener);
+            _listener.BeginGetContext(ProcessWebRequest, _listener);
             while (_network.Running)
             {
                 Thread.Sleep(100);
             }
 
-            lock (_webInterfaceThread)
+            lock (_listener)
             {
-                listener.Stop();
+                _listener.Stop();
             }
         }
     }

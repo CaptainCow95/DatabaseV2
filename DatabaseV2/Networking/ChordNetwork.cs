@@ -33,6 +33,11 @@ namespace DatabaseV2.Networking
         private readonly Thread _stabilizationThread;
 
         /// <summary>
+        /// A value indicating whether the object has already been _disposed.
+        /// </summary>
+        private bool _disposed = false;
+
+        /// <summary>
         /// The next finger to update during stabilization.
         /// </summary>
         private int _nextFingerNode = 1;
@@ -67,7 +72,7 @@ namespace DatabaseV2.Networking
                     if (message.Success && message.Response.MessageType == "ChordSuccessorResponse")
                     {
                         var data = message.Response.Data;
-                        _fingerTable[0] = new ChordNode(new NodeDefinition(data["Successor"].ValueAsString), (uint)data["ChordId"].ValueAsInt64);
+                        _fingerTable[0] = new ChordNode(new NodeDefinition(data["Successor"].ValueAsString()), (uint)data["ChordId"].ValueAsInt64());
                         if (!Equals(_fingerTable[0], _self) && !Connect(_fingerTable[0].Node))
                         {
                             _fingerTable[0] = _self;
@@ -104,6 +109,24 @@ namespace DatabaseV2.Networking
             if (!_stabilizationThread.Join(5000))
             {
                 _stabilizationThread.Abort();
+            }
+        }
+
+        /// <summary>
+        /// Releases all resources used by the current instance of the <see cref="ChordNetwork"/> class.
+        /// </summary>
+        /// <param name="disposing">Whether to dispose of managed resources or not.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _chordLock.Dispose();
+                    _disposed = true;
+                }
+
+                base.Dispose(disposing);
             }
         }
 
@@ -165,9 +188,9 @@ namespace DatabaseV2.Networking
                 _chordLock.EnterWriteLock();
 
                 var data = message.Data;
-                if (_predecessor == null || IsBetween((uint)data["ChordId"].ValueAsInt64, _predecessor.ChordId, _self.ChordId))
+                if (_predecessor == null || IsBetween((uint)data["ChordId"].ValueAsInt64(), _predecessor.ChordId, _self.ChordId))
                 {
-                    _predecessor = new ChordNode(new NodeDefinition(data["Node"].ValueAsString), (uint)data["ChordId"].ValueAsInt64);
+                    _predecessor = new ChordNode(new NodeDefinition(data["Node"].ValueAsString()), (uint)data["ChordId"].ValueAsInt64());
                     if (!Connect(_predecessor.Node))
                     {
                         _predecessor = null;
@@ -239,7 +262,7 @@ namespace DatabaseV2.Networking
 
             var data = message.Response.Data;
 
-            return new ChordNode(new NodeDefinition(data["Successor"].ValueAsString), (uint)data["ChordId"].ValueAsInt64);
+            return new ChordNode(new NodeDefinition(data["Successor"].ValueAsString()), (uint)data["ChordId"].ValueAsInt64());
         }
 
         /// <summary>
@@ -284,7 +307,7 @@ namespace DatabaseV2.Networking
                     }
 
                     var data = message.Response.Data;
-                    predecessor = new ChordNode(new NodeDefinition(data["Predecessor"].ValueAsString), (uint)data["ChordId"].ValueAsInt64);
+                    predecessor = new ChordNode(new NodeDefinition(data["Predecessor"].ValueAsString()), (uint)data["ChordId"].ValueAsInt64());
                 }
                 else
                 {

@@ -87,107 +87,95 @@ namespace Library.Data
         }
 
         /// <summary>
-        /// Gets the value as an array.
-        /// </summary>
-        public List<DocumentEntry> ValueAsArray
-        {
-            get
-            {
-                if (_valueType == DocumentEntryType.Array)
-                {
-                    return (List<DocumentEntry>)_value;
-                }
-
-                throw new DataTypeException(_value.GetType(), typeof(List<DocumentEntry>));
-            }
-        }
-
-        /// <summary>
-        /// Gets a value indicating whether the value is true or false.
-        /// </summary>
-        public bool ValueAsBoolean
-        {
-            get
-            {
-                if (_valueType == DocumentEntryType.Boolean)
-                {
-                    return Convert.ToBoolean(_value);
-                }
-
-                throw new DataTypeException(_value.GetType(), typeof(bool));
-            }
-        }
-
-        /// <summary>
-        /// Gets the value as a document.
-        /// </summary>
-        public Document ValueAsDocument
-        {
-            get
-            {
-                if (_valueType == DocumentEntryType.Document)
-                {
-                    return (Document)_value;
-                }
-
-                throw new DataTypeException(_value.GetType(), typeof(Document));
-            }
-        }
-
-        /// <summary>
-        /// Gets the value as a double.
-        /// </summary>
-        public double ValueAsDouble
-        {
-            get
-            {
-                if (_valueType == DocumentEntryType.Double)
-                {
-                    return Convert.ToDouble(_value);
-                }
-
-                throw new DataTypeException(_value.GetType(), typeof(float));
-            }
-        }
-
-        /// <summary>
-        /// Gets the value as an 64-bit integer.
-        /// </summary>
-        public long ValueAsInt64
-        {
-            get
-            {
-                if (_valueType == DocumentEntryType.Int64)
-                {
-                    return Convert.ToInt64(_value);
-                }
-
-                throw new DataTypeException(_value.GetType(), typeof(int));
-            }
-        }
-
-        /// <summary>
-        /// Gets the value as a string.
-        /// </summary>
-        public string ValueAsString
-        {
-            get
-            {
-                if (_valueType == DocumentEntryType.String)
-                {
-                    return Convert.ToString(_value);
-                }
-
-                throw new DataTypeException(_value.GetType(), typeof(string));
-            }
-        }
-
-        /// <summary>
         /// Gets the type of the value.
         /// </summary>
         public DocumentEntryType ValueType
         {
             get { return _valueType; }
+        }
+
+        /// <summary>
+        /// Gets the value as an array.
+        /// </summary>
+        /// <returns>The value as an array.</returns>
+        public List<DocumentEntry> ValueAsArray()
+        {
+            if (_valueType == DocumentEntryType.Array)
+            {
+                return (List<DocumentEntry>)_value;
+            }
+
+            throw new DataTypeException(_value.GetType(), typeof(List<DocumentEntry>));
+        }
+
+        /// <summary>
+        /// Gets a value indicating whether the value is true or false.
+        /// </summary>
+        /// <returns>The value as a boolean.</returns>
+        public bool ValueAsBoolean()
+        {
+            if (_valueType == DocumentEntryType.Boolean)
+            {
+                return Convert.ToBoolean(_value);
+            }
+
+            throw new DataTypeException(_value.GetType(), typeof(bool));
+        }
+
+        /// <summary>
+        /// Gets the value as a document.
+        /// </summary>
+        /// <returns>The value as a document.</returns>
+        public Document ValueAsDocument()
+        {
+            if (_valueType == DocumentEntryType.Document)
+            {
+                return (Document)_value;
+            }
+
+            throw new DataTypeException(_value.GetType(), typeof(Document));
+        }
+
+        /// <summary>
+        /// Gets the value as a double.
+        /// </summary>
+        /// <returns>The value as a double.</returns>
+        public double ValueAsDouble()
+        {
+            if (_valueType == DocumentEntryType.Double)
+            {
+                return Convert.ToDouble(_value);
+            }
+
+            throw new DataTypeException(_value.GetType(), typeof(float));
+        }
+
+        /// <summary>
+        /// Gets the value as an 64-bit integer.
+        /// </summary>
+        /// <returns>The value as a 64-bit integer.</returns>
+        public long ValueAsInt64()
+        {
+            if (_valueType == DocumentEntryType.Int64)
+            {
+                return Convert.ToInt64(_value);
+            }
+
+            throw new DataTypeException(_value.GetType(), typeof(int));
+        }
+
+        /// <summary>
+        /// Gets the value as a string.
+        /// </summary>
+        /// <returns>The value as a string.</returns>
+        public string ValueAsString()
+        {
+            if (_valueType == DocumentEntryType.String)
+            {
+                return Convert.ToString(_value);
+            }
+
+            throw new DataTypeException(_value.GetType(), typeof(string));
         }
 
         /// <summary>

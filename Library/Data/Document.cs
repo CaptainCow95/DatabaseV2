@@ -53,8 +53,7 @@ namespace Library.Data
         /// <param name="json">The json to initialize the document with.</param>
         public Document(string json)
         {
-            using (StringReader stringReader = new StringReader(json))
-            using (JsonTextReader reader = new JsonTextReader(stringReader))
+            using (JsonTextReader reader = new JsonTextReader(new StringReader(json)))
             {
                 reader.Read();
                 if (reader.TokenType != JsonToken.StartObject)
@@ -65,7 +64,7 @@ namespace Library.Data
                 while (reader.Read() && reader.TokenType != JsonToken.EndObject)
                 {
                     DocumentEntry entry = new DocumentEntry(reader, false);
-                    if (entry.ValueType == DocumentEntryType.Document && !entry.ValueAsDocument.Valid)
+                    if (entry.ValueType == DocumentEntryType.Document && !entry.ValueAsDocument().Valid)
                     {
                         _valid = false;
                         return;
@@ -112,7 +111,7 @@ namespace Library.Data
                     string subfield = key.Substring(0, key.IndexOf(".", StringComparison.InvariantCulture));
                     if (_data.ContainsKey(subfield) && _data[subfield].ValueType == DocumentEntryType.Document)
                     {
-                        return _data[subfield].ValueAsDocument[key.Substring(subfield.Length + 1)];
+                        return _data[subfield].ValueAsDocument()[key.Substring(subfield.Length + 1)];
                     }
                 }
                 else
@@ -130,7 +129,7 @@ namespace Library.Data
                     string subfield = key.Substring(0, key.IndexOf(".", StringComparison.InvariantCulture));
                     if (_data.ContainsKey(subfield) && _data[subfield].ValueType == DocumentEntryType.Document)
                     {
-                        _data[subfield].ValueAsDocument[key.Substring(subfield.Length + 1)] = value;
+                        _data[subfield].ValueAsDocument()[key.Substring(subfield.Length + 1)] = value;
                     }
                 }
                 else
@@ -152,7 +151,7 @@ namespace Library.Data
                 string subfield = key.Substring(0, key.IndexOf(".", StringComparison.InvariantCulture));
                 if (_data.ContainsKey(subfield) && _data[subfield].ValueType == DocumentEntryType.Document)
                 {
-                    return _data[subfield].ValueAsDocument.ContainsKey(key.Substring(subfield.Length + 1));
+                    return _data[subfield].ValueAsDocument().ContainsKey(key.Substring(subfield.Length + 1));
                 }
             }
             else
@@ -183,8 +182,7 @@ namespace Library.Data
         {
             StringBuilder builder = new StringBuilder();
 
-            using (StringWriter stringWriter = new StringWriter(builder))
-            using (JsonTextWriter writer = new JsonTextWriter(stringWriter))
+            using (JsonTextWriter writer = new JsonTextWriter(new StringWriter(builder)))
             {
                 Write(writer);
             }

@@ -12,7 +12,7 @@ namespace Library.Networking
     /// <summary>
     /// Handles network connections.
     /// </summary>
-    public class Network
+    public class Network : IDisposable
     {
         /// <summary>
         /// The connection cleaner thread.
@@ -78,6 +78,11 @@ namespace Library.Networking
         /// The messages waiting for responses.
         /// </summary>
         private readonly Dictionary<uint, Message> _waitingForResponses = new Dictionary<uint, Message>();
+
+        /// <summary>
+        /// A value indicating whether the object has already been _disposed.
+        /// </summary>
+        private bool _disposed = false;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Network"/> class.
@@ -172,6 +177,14 @@ namespace Library.Networking
         }
 
         /// <summary>
+        /// Releases all resources used by the current instance of the <see cref="Network"/> class.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+
+        /// <summary>
         /// Gets a list of the connected nodes.
         /// </summary>
         /// <returns>A list of the connected nodes.</returns>
@@ -187,9 +200,8 @@ namespace Library.Networking
         /// <returns>True if the node was found, otherwise false.</returns>
         public bool IsConnected(NodeDefinition node)
         {
-            bool found = false;
             _outgoingConnectionsLock.EnterReadLock();
-            found = _outgoingConnections.ContainsKey(node) && _outgoingConnections[node].Status == ConnectionStatus.Connected;
+            bool found = _outgoingConnections.ContainsKey(node) && _outgoingConnections[node].Status == ConnectionStatus.Connected;
             _outgoingConnectionsLock.ExitReadLock();
 
             if (!found)
@@ -229,6 +241,25 @@ namespace Library.Networking
             _cleanerThread.Join();
             _messageReceivedPool.Shutdown();
             _messageSendPool.Shutdown();
+        }
+
+        /// <summary>
+        /// Releases all resources used by the current instance of the <see cref="Network"/> class.
+        /// </summary>
+        /// <param name="disposing">Whether to dispose of managed resources or not.</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _messageReceivedPool.Dispose();
+                    _messageSendPool.Dispose();
+                    _incomingConnectionsLock.Dispose();
+                    _outgoingConnectionsLock.Dispose();
+                    _disposed = true;
+                }
+            }
         }
 
         /// <summary>
@@ -301,7 +332,7 @@ namespace Library.Networking
             if (message.MessageType == "JoinRequest")
             {
                 var data = message.Data;
-                var dataAddress = new NodeDefinition(data["Address"].ValueAsString);
+                var dataAddress = new NodeDefinition(data["Address"].ValueAsString());
                 RenameConnection(message.Address, dataAddress);
                 _incomingConnectionsLock.EnterReadLock();
                 _incomingConnections[dataAddress].ConnectionEstablished();

@@ -1,4 +1,5 @@
 ﻿using Library.Networking;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
@@ -8,22 +9,27 @@ namespace Driver
     /// <summary>
     /// Represents the main interface to the database.
     /// </summary>
-    public class Driver
+    public class Driver : IDisposable
     {
         /// <summary>
         /// The network to connect through.
         /// </summary>
-        private Network _network;
+        private readonly Network _network;
 
         /// <summary>
         /// A list of the nodes in the connection string.
         /// </summary>
-        private List<NodeDefinition> _nodes;
+        private readonly List<NodeDefinition> _nodes;
 
         /// <summary>
         /// The reconnection thread.
         /// </summary>
-        private Thread _reconnectionThread;
+        private readonly Thread _reconnectionThread;
+
+        /// <summary>
+        /// A value indicating whether the object has already been _disposed.
+        /// </summary>
+        private bool _disposed = false;
 
         /// <summary>
         /// A value indicating whether the driver is running.
@@ -48,6 +54,30 @@ namespace Driver
 
             _reconnectionThread = new Thread(RunReconnection);
             _reconnectionThread.Start();
+        }
+
+        /// <summary>
+        /// Releases all resources used by the current instance of the <see cref="Network"/> class.
+        /// </summary>
+        public void Dispose()
+        {
+            Dispose(true);
+        }
+
+        /// <summary>
+        /// Releases all resources used by the current instance of the <see cref="Network"/> class.
+        /// </summary>
+        /// <param name="disposing">Whether to dispose of managed resources or not.</param>
+        protected virtual void Dispose(bool disposing)
+        {
+            if (!_disposed)
+            {
+                if (disposing)
+                {
+                    _network.Dispose();
+                    _disposed = true;
+                }
+            }
         }
 
         /// <summary>
