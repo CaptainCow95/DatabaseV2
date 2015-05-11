@@ -8,7 +8,8 @@ configuration:
   - Release
 
 install:
-  - cinst stylecop
+  - Invoke-WebRequest "https://stylecop.codeplex.com/downloads/get/323236" -OutFile ./StyleCopInstaller.msi
+  - .\StyleCopInstaller.msi /quiet
 
 before_build:
   - nuget restore
