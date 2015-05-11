@@ -1,6 +1,11 @@
 language: csharp
 solution: DatabaseV2.sln
+before_install:
+ - wget "https://raw.githubusercontent.com/enckse/travis-mono-scripts/master/stylecop.sh"
+ - sudo chmod a+x stylecop.sh
+ - ./stylecop.sh
 install:
  - nuget restore DatabaseV2.sln
+ - mono StyleCopCmd.Console.exe -s DatabaseV2.sln
 script:
  - xbuild /p:Configuration=Release DatabaseV2.sln
