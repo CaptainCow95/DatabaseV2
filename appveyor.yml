@@ -8,7 +8,7 @@ configuration:
   - Release
 
 install:
-  - ps: (new-object net.webclient).DownloadFile('https://stylecop.codeplex.com/downloads/get/323236', 'StyleCopInstaller.msi')
+  - ps: Invoke-WebRequest "https://stylecop.codeplex.com/downloads/get/323236" -OutFile "StyleCopInstaller.msi"
   - ps: Start-Process .\StyleCopInstaller.msi /quiet -Wait
 
 before_build:
