@@ -8,8 +8,8 @@ configuration:
   - Release
 
 install:
-  - Invoke-WebRequest "https://stylecop.codeplex.com/downloads/get/323236" -OutFile ./StyleCopInstaller.msi
-  - .\StyleCopInstaller.msi /quiet
+  - ps: (new-object net.webclient).DownloadFile('https://stylecop.codeplex.com/downloads/get/323236', 'StyleCopInstaller.msi')
+  - ps: msiexec /i StyleCopInstaller.msi /quiet /qn /norestart /log install.log
 
 before_build:
   - nuget restore
