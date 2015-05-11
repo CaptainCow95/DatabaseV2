@@ -9,3 +9,6 @@ configuration:
 
 install:
   - cinst stylecop
+
+before_build:
+  - nuget restore
