@@ -2,6 +2,8 @@ language: csharp
 solution: DatabaseV2.sln
 install:
  - nuget restore DatabaseV2.sln
- - mono .\ThirdParty\StyleCop.Console\StyleCop.Console.exe -p ..\..\ -s ..\..\Settings.StyleCop
+ - cd ThirdParty\StyleCop.Console
+ - mono StyleCop.Console.exe -p ..\..\ -s ..\..\Settings.StyleCop
+ - cd ..\..\
 script:
  - xbuild /p:Configuration=Release DatabaseV2.sln
