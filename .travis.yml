@@ -6,6 +6,6 @@ before_install:
  - ./stylecop.sh
 install:
  - nuget restore DatabaseV2.sln
- - mono /opt/stylecop/StyleCopCmd.Console.exe -s DatabaseV2.sln
+ - mono --runtime=v3.5.0.0 /opt/stylecop/StyleCopCmd.Console.exe -s DatabaseV2.sln
 script:
  - xbuild /p:Configuration=Release DatabaseV2.sln
