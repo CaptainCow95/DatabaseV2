@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Library", "Library\Library.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Driver", "Driver\Driver.csproj", "{873B188E-6DED-4AEE-964E-80E492ECC1A4}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTests", "UnitTests\UnitTests.csproj", "{13E6CFF0-19CD-45DB-82EE-3C05A5E025B3}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -27,6 +29,10 @@ Global
 		{873B188E-6DED-4AEE-964E-80E492ECC1A4}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{873B188E-6DED-4AEE-964E-80E492ECC1A4}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{873B188E-6DED-4AEE-964E-80E492ECC1A4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{13E6CFF0-19CD-45DB-82EE-3C05A5E025B3}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{13E6CFF0-19CD-45DB-82EE-3C05A5E025B3}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{13E6CFF0-19CD-45DB-82EE-3C05A5E025B3}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{13E6CFF0-19CD-45DB-82EE-3C05A5E025B3}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
