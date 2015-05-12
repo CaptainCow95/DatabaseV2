@@ -46,7 +46,6 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="DatabaseNetwork.cs" />
-    <Compile Include="DatabaseNetworkv2.cs" />
     <Compile Include="DatabaseNode.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

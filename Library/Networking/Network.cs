@@ -368,10 +368,6 @@ namespace Library.Networking
 
                 SendMessage(response);
             }
-            else if (message.MessageType == "Heartbeat")
-            {
-                SendMessage(new Message(message, "HeartbeatResponse", new Document(), false));
-            }
             else
             {
                 if (!HandleMessage(message) && MessageReceived != null)
@@ -639,7 +635,7 @@ namespace Library.Networking
 
                 foreach (var conn in _outgoingConnections)
                 {
-                    Message message = new Message(conn.Key, "Heartbeat", new Document(), true);
+                    Message message = new Message(conn.Key, "Heartbeat", new Document(), false);
                     messages.Add(message);
                     SendMessage(message);
                 }
@@ -650,7 +646,10 @@ namespace Library.Networking
 
                 foreach (var conn in _incomingConnections)
                 {
-                    Message message = new Message(conn.Key, "Heartbeat", new Document(), true);
+                    Message message = new Message(conn.Key, "Heartbeat", new Document(), false)
+                    {
+                        Type = ConnectionType.Incoming
+                    };
                     messages.Add(message);
                     SendMessage(message);
                 }

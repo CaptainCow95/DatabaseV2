@@ -182,7 +182,7 @@ namespace Library.Networking
         /// <summary>
         /// Gets the type of the connection.
         /// </summary>
-        public ConnectionType Type { get; private set; }
+        public ConnectionType Type { get; internal set; }
 
         /// <summary>
         /// Gets a value indicating whether the message is waiting for a response.

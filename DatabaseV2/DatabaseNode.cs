@@ -147,10 +147,12 @@ namespace DatabaseV2
         {
             StringBuilder builder = new StringBuilder();
             builder.Append("<html><body>");
-            builder.Append("<b>Predecessor:</b> ");
-            builder.Append(_network.Predecessor == null ? "null" : _network.Predecessor.ConnectionName);
-            builder.Append("<br/><b>Successor:</b> ");
-            builder.Append(_network.Successor == null ? "null" : _network.Successor.ConnectionName);
+            builder.Append("<b>Connected Nodes:</b>");
+            foreach (var item in _network.GetConnectedNodes())
+            {
+                builder.Append("<br/>");
+                builder.Append(item.ConnectionName);
+            }
 
             builder.Append("</body></html>");
             return builder.ToString();
