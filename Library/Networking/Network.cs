@@ -262,6 +262,10 @@ namespace Library.Networking
             }
         }
 
+        /// <summary>
+        /// Gets a list of the connected incoming nodes.
+        /// </summary>
+        /// <returns>A list of the connected incoming nodes.</returns>
         protected IEnumerable<NodeDefinition> GetIncomingConnectedNodes()
         {
             _incomingConnectionsLock.EnterReadLock();
@@ -270,6 +274,10 @@ namespace Library.Networking
             return ret;
         }
 
+        /// <summary>
+        /// Gets a list of the connected outgoing nodes.
+        /// </summary>
+        /// <returns>A list of the connected outgoing nodes.</returns>
         protected IEnumerable<NodeDefinition> GetOutgoingConnectedNodes()
         {
             _outgoingConnectionsLock.EnterReadLock();
