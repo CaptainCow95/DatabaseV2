@@ -10,11 +10,6 @@ namespace Library.Data
     public class DocumentEntry
     {
         /// <summary>
-        /// The key of the entry.
-        /// </summary>
-        private readonly string _key;
-
-        /// <summary>
         /// The value of the entry.
         /// </summary>
         private readonly object _value;
@@ -27,29 +22,63 @@ namespace Library.Data
         /// <summary>
         /// Initializes a new instance of the <see cref="DocumentEntry"/> class.
         /// </summary>
-        /// <param name="key">The key for the entry.</param>
         /// <param name="value">The value for the entry.</param>
-        /// <param name="type">The type for the entry.</param>
-        public DocumentEntry(string key, object value, DocumentEntryType type)
+        public DocumentEntry(List<DocumentEntry> value)
+            : this(value, DocumentEntryType.Array)
         {
-            _key = key;
-            _value = value;
-            _valueType = type;
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DocumentEntry"/> class.
+        /// </summary>
+        /// <param name="value">The value for the entry.</param>
+        public DocumentEntry(bool value)
+            : this(value, DocumentEntryType.Boolean)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DocumentEntry"/> class.
+        /// </summary>
+        /// <param name="value">The value for the entry.</param>
+        public DocumentEntry(double value)
+            : this(value, DocumentEntryType.Double)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DocumentEntry"/> class.
+        /// </summary>
+        /// <param name="value">The value for the entry.</param>
+        public DocumentEntry(Document value)
+            : this(value, DocumentEntryType.Document)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DocumentEntry"/> class.
+        /// </summary>
+        /// <param name="value">The value for the entry.</param>
+        public DocumentEntry(string value)
+            : this(value, DocumentEntryType.String)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DocumentEntry"/> class.
+        /// </summary>
+        /// <param name="value">The value for the entry.</param>
+        public DocumentEntry(long value)
+            : this(value, DocumentEntryType.Int64)
+        {
         }
 
         /// <summary>
         /// Initializes a new instance of the <see cref="DocumentEntry"/> class.
         /// </summary>
         /// <param name="reader">The <see cref="JsonTextReader"/> to read from.</param>
-        /// <param name="arrayEntry">A value indicating whether this is an array entry.</param>
-        public DocumentEntry(JsonTextReader reader, bool arrayEntry)
+        internal DocumentEntry(JsonTextReader reader)
         {
-            if (!arrayEntry)
-            {
-                _key = (string)reader.Value;
-                reader.Read();
-            }
-
             switch (reader.TokenType)
             {
                 case JsonToken.StartArray:
@@ -71,11 +100,14 @@ namespace Library.Data
         }
 
         /// <summary>
-        /// Gets the key.
+        /// Initializes a new instance of the <see cref="DocumentEntry"/> class.
         /// </summary>
-        public string Key
+        /// <param name="value">The value for the entry.</param>
+        /// <param name="type">The type for the entry.</param>
+        private DocumentEntry(object value, DocumentEntryType type)
         {
-            get { return _key; }
+            _value = value;
+            _valueType = type;
         }
 
         /// <summary>
@@ -182,7 +214,7 @@ namespace Library.Data
         /// Writes the entry to a <see cref="JsonTextWriter"/>.
         /// </summary>
         /// <param name="writer">The <see cref="JsonTextWriter"/> to write to.</param>
-        public void Write(JsonTextWriter writer)
+        internal void Write(JsonTextWriter writer)
         {
             switch (_valueType)
             {
@@ -217,7 +249,7 @@ namespace Library.Data
             List<DocumentEntry> entries = new List<DocumentEntry>();
             while (reader.Read() && reader.TokenType != JsonToken.EndArray)
             {
-                entries.Add(new DocumentEntry(reader, true));
+                entries.Add(new DocumentEntry(reader));
             }
 
             return entries;

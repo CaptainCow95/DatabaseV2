@@ -156,8 +156,11 @@ namespace Library.Networking
             }
 
             _outgoingConnectionsLock.ExitReadLock();
-            Document messageData = new Document();
-            messageData["Address"] = new DocumentEntry("Address", new NodeDefinition("localhost", _port).ConnectionName, DocumentEntryType.String);
+            Document messageData = new Document
+            {
+                { "Address", new NodeDefinition("localhost", _port).ConnectionName }
+            };
+            messageData["Address"] = new DocumentEntry(new NodeDefinition("localhost", _port).ConnectionName);
             var message = new Message(definition, "JoinRequest", messageData, true)
             {
                 RequireSecureConnection = false

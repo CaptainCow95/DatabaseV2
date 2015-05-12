@@ -62,9 +62,10 @@ namespace DatabaseV2
         {
             if (message.MessageType == "NeighborListRequest")
             {
-                Document data = new Document();
-                List<DocumentEntry> neighbors = GetOutgoingConnectedNodes().Select(node => new DocumentEntry(string.Empty, node.ConnectionName, DocumentEntryType.String)).ToList();
-                data["Neighbors"] = new DocumentEntry("Neighbors", neighbors, DocumentEntryType.Array);
+                Document data = new Document
+                {
+                    { "Neighbors", GetOutgoingConnectedNodes().Select(node => new DocumentEntry(node.ConnectionName)).ToList() }
+                };
                 SendMessage(new Message(message, "NeighborListResponse", data, false));
             }
 

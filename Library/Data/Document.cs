@@ -32,24 +32,6 @@ namespace Library.Data
         /// <summary>
         /// Initializes a new instance of the <see cref="Document"/> class.
         /// </summary>
-        /// <param name="reader">The json reader to initialize the document with.</param>
-        public Document(JsonTextReader reader)
-        {
-            while (reader.Read() && reader.TokenType != JsonToken.EndObject)
-            {
-                DocumentEntry entry = new DocumentEntry(reader, false);
-                _data.Add(entry.Key, entry);
-            }
-
-            if (reader.TokenType != JsonToken.EndObject)
-            {
-                throw new ArgumentException("Invalid json given.");
-            }
-        }
-
-        /// <summary>
-        /// Initializes a new instance of the <see cref="Document"/> class.
-        /// </summary>
         /// <param name="json">The json to initialize the document with.</param>
         public Document(string json)
         {
@@ -63,14 +45,16 @@ namespace Library.Data
 
                 while (reader.Read() && reader.TokenType != JsonToken.EndObject)
                 {
-                    DocumentEntry entry = new DocumentEntry(reader, false);
+                    string key = (string)reader.Value;
+                    reader.Read();
+                    DocumentEntry entry = new DocumentEntry(reader);
                     if (entry.ValueType == DocumentEntryType.Document && !entry.ValueAsDocument().Valid)
                     {
                         _valid = false;
                         return;
                     }
 
-                    _data.Add(entry.Key, entry);
+                    _data.Add(key, entry);
                 }
 
                 if (reader.TokenType != JsonToken.EndObject)
@@ -82,6 +66,26 @@ namespace Library.Data
                 {
                     throw new ArgumentException("Invalid json given.");
                 }
+            }
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Document"/> class.
+        /// </summary>
+        /// <param name="reader">The json reader to initialize the document with.</param>
+        internal Document(JsonTextReader reader)
+        {
+            while (reader.Read() && reader.TokenType != JsonToken.EndObject)
+            {
+                string key = (string)reader.Value;
+                reader.Read();
+                DocumentEntry entry = new DocumentEntry(reader);
+                _data.Add(key, entry);
+            }
+
+            if (reader.TokenType != JsonToken.EndObject)
+            {
+                throw new ArgumentException("Invalid json given.");
             }
         }
 
@@ -140,6 +144,66 @@ namespace Library.Data
         }
 
         /// <summary>
+        /// Adds the specified key and value.
+        /// </summary>
+        /// <param name="key">The key of the element to add.</param>
+        /// <param name="value">The value of the element to add.</param>
+        public void Add(string key, string value)
+        {
+            _data.Add(key, new DocumentEntry(value));
+        }
+
+        /// <summary>
+        /// Adds the specified key and value.
+        /// </summary>
+        /// <param name="key">The key of the element to add.</param>
+        /// <param name="value">The value of the element to add.</param>
+        public void Add(string key, long value)
+        {
+            _data.Add(key, new DocumentEntry(value));
+        }
+
+        /// <summary>
+        /// Adds the specified key and value.
+        /// </summary>
+        /// <param name="key">The key of the element to add.</param>
+        /// <param name="value">The value of the element to add.</param>
+        public void Add(string key, double value)
+        {
+            _data.Add(key, new DocumentEntry(value));
+        }
+
+        /// <summary>
+        /// Adds the specified key and value.
+        /// </summary>
+        /// <param name="key">The key of the element to add.</param>
+        /// <param name="value">The value of the element to add.</param>
+        public void Add(string key, bool value)
+        {
+            _data.Add(key, new DocumentEntry(value));
+        }
+
+        /// <summary>
+        /// Adds the specified key and value.
+        /// </summary>
+        /// <param name="key">The key of the element to add.</param>
+        /// <param name="value">The value of the element to add.</param>
+        public void Add(string key, Document value)
+        {
+            _data.Add(key, new DocumentEntry(value));
+        }
+
+        /// <summary>
+        /// Adds the specified key and value.
+        /// </summary>
+        /// <param name="key">The key of the element to add.</param>
+        /// <param name="value">The value of the element to add.</param>
+        public void Add(string key, List<DocumentEntry> value)
+        {
+            _data.Add(key, new DocumentEntry(value));
+        }
+
+        /// <summary>
         /// Checks if the document contains the specified key.
         /// </summary>
         /// <param name="key">The key to search for.</param>
@@ -175,6 +239,16 @@ namespace Library.Data
         }
 
         /// <summary>
+        /// Removes the value with the specified key.
+        /// </summary>
+        /// <param name="key">The key of the element to remove.</param>
+        /// <returns>True if a value was removed, otherwise false.</returns>
+        public bool Remove(string key)
+        {
+            return _data.Remove(key);
+        }
+
+        /// <summary>
         /// Converts a document to json.
         /// </summary>
         /// <returns>The json represents the document.</returns>
@@ -194,7 +268,7 @@ namespace Library.Data
         /// Writes the entry to a <see cref="JsonTextWriter"/>.
         /// </summary>
         /// <param name="writer">The <see cref="JsonTextWriter"/> to write to.</param>
-        public void Write(JsonTextWriter writer)
+        internal void Write(JsonTextWriter writer)
         {
             writer.WriteStartObject();
 
