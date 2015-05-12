@@ -1,26 +1,20 @@
-﻿using Library.Data;
+using Library.Data;
 using Library.Networking;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading;
 
-namespace DatabaseV2.Networking
+namespace DatabaseV2
 {
     /// <summary>
-    /// Represents a chord network.
+    /// Represents a database network, based on a chord network.
     /// </summary>
-    public class ChordNetwork : Network
+    public class DatabaseNetwork : Network
     {
         /// <summary>
         /// The object to lock on when editing the finger table or the predecessor.
         /// </summary>
         private readonly ReaderWriterLockSlim _chordLock = new ReaderWriterLockSlim();
-
-        /// <summary>
-        /// The chord finger table.
-        /// </summary>
-        private readonly ChordNode[] _fingerTable = new ChordNode[32];
 
         /// <summary>
         /// The current chord node.
@@ -38,21 +32,21 @@ namespace DatabaseV2.Networking
         private bool _disposed = false;
 
         /// <summary>
-        /// The next finger to update during stabilization.
-        /// </summary>
-        private int _nextFingerNode = 1;
-
-        /// <summary>
         /// The predecessor chord node.
         /// </summary>
         private ChordNode _predecessor;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="ChordNetwork"/> class.
+        /// The successor chord node.
+        /// </summary>
+        private ChordNode _successor;
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="DatabaseNetwork"/> class.
         /// </summary>
         /// <param name="port">The port to listen for connections on.</param>
         /// <param name="nodes">The nodes to try to connect to the network of.</param>
-        public ChordNetwork(int port, List<NodeDefinition> nodes)
+        public DatabaseNetwork(int port, List<NodeDefinition> nodes)
             : base(port)
         {
             byte[] randomBytes = new byte[4];
@@ -60,7 +54,7 @@ namespace DatabaseV2.Networking
             uint chordId = BitConverter.ToUInt32(randomBytes, 0);
 
             _self = new ChordNode(new NodeDefinition("localhost", Port), chordId);
-            _fingerTable[0] = _self;
+            _successor = _self;
 
             foreach (var node in nodes)
             {
@@ -72,10 +66,10 @@ namespace DatabaseV2.Networking
                     if (message.Success && message.Response.MessageType == "ChordSuccessorResponse")
                     {
                         var data = message.Response.Data;
-                        _fingerTable[0] = new ChordNode(new NodeDefinition(data["Successor"].ValueAsString()), (uint)data["ChordId"].ValueAsInt64());
-                        if (!Equals(_fingerTable[0], _self) && !Connect(_fingerTable[0].Node))
+                        _successor = new ChordNode(new NodeDefinition(data["Successor"].ValueAsString()), (uint)data["ChordId"].ValueAsInt64());
+                        if (!Equals(_successor, _self) && !Connect(_successor.Node))
                         {
-                            _fingerTable[0] = _self;
+                            _successor = _self;
                         }
                     }
                 }
@@ -86,19 +80,19 @@ namespace DatabaseV2.Networking
         }
 
         /// <summary>
-        /// Gets the node's finger table.
-        /// </summary>
-        public IEnumerable<NodeDefinition> FingerTable
-        {
-            get { return _fingerTable.Select(e => e == null ? null : e.Node); }
-        }
-
-        /// <summary>
         /// Gets the node's predecessor in the chord ring.
         /// </summary>
         public NodeDefinition Predecessor
         {
             get { return _predecessor == null ? null : _predecessor.Node; }
+        }
+
+        /// <summary>
+        /// Gets the node's successor in the chord ring.
+        /// </summary>
+        public NodeDefinition Successor
+        {
+            get { return _successor == null ? null : _successor.Node; }
         }
 
         /// <inheritdoc />
@@ -113,7 +107,7 @@ namespace DatabaseV2.Networking
         }
 
         /// <summary>
-        /// Releases all resources used by the current instance of the <see cref="ChordNetwork"/> class.
+        /// Releases all resources used by the current instance of the <see cref="DatabaseNetwork"/> class.
         /// </summary>
         /// <param name="disposing">Whether to dispose of managed resources or not.</param>
         protected override void Dispose(bool disposing)
@@ -140,17 +134,9 @@ namespace DatabaseV2.Networking
                 _predecessor = null;
             }
 
-            if (_fingerTable[0] != null && Equals(_fingerTable[0].Node, node))
+            if (_successor != null && Equals(_successor.Node, node))
             {
-                _fingerTable[0] = _self;
-            }
-
-            for (int i = 1; i < 32; ++i)
-            {
-                if (_fingerTable[i] != null && Equals(_fingerTable[i].Node, node))
-                {
-                    _fingerTable[i] = null;
-                }
+                _successor = _self;
             }
 
             _chordLock.ExitWriteLock();
@@ -163,8 +149,8 @@ namespace DatabaseV2.Networking
             {
                 _chordLock.EnterReadLock();
                 Document responseData = new Document();
-                responseData["Successor"] = new DocumentEntry("Successor", _fingerTable[0].Node.ConnectionName, DocumentEntryType.String);
-                responseData["ChordId"] = new DocumentEntry("ChordId", _fingerTable[0].ChordId, DocumentEntryType.Int64);
+                responseData["Successor"] = new DocumentEntry("Successor", _successor.Node.ConnectionName, DocumentEntryType.String);
+                responseData["ChordId"] = new DocumentEntry("ChordId", _successor.ChordId, DocumentEntryType.Int64);
                 Message response = new Message(message, "ChordSuccessorResponse", responseData, false);
                 SendMessage(response);
                 _chordLock.ExitReadLock();
@@ -213,7 +199,9 @@ namespace DatabaseV2.Networking
         {
             _chordLock.EnterReadLock();
 
-            ChordNode ret = null;
+            // TODO: Find the closest node to the specified id among all nodes, not just the successor.
+            ChordNode ret = _successor;
+            /*
             for (int i = 31; i >= 1; --i)
             {
                 if (_fingerTable[i] != null && IsBetween(_fingerTable[i].ChordId, _self.ChordId, id))
@@ -221,12 +209,7 @@ namespace DatabaseV2.Networking
                     ret = _fingerTable[i];
                     break;
                 }
-            }
-
-            if (ret == null)
-            {
-                ret = _fingerTable[0];
-            }
+            }*/
 
             _chordLock.ExitReadLock();
             return ret;
@@ -241,9 +224,9 @@ namespace DatabaseV2.Networking
         {
             _chordLock.EnterReadLock();
 
-            if (_fingerTable[0] != null && (IsBetween(id, _self.ChordId, _fingerTable[0].ChordId) || id == _fingerTable[0].ChordId))
+            if (_successor != null && (IsBetween(id, _self.ChordId, _successor.ChordId) || id == _successor.ChordId))
             {
-                ChordNode ret = _fingerTable[0];
+                ChordNode ret = _successor;
                 _chordLock.ExitReadLock();
                 return ret;
             }
@@ -295,9 +278,9 @@ namespace DatabaseV2.Networking
 
                 ChordNode predecessor;
                 Message message;
-                if (!Equals(_fingerTable[0], _self))
+                if (!Equals(_successor, _self))
                 {
-                    message = new Message(_fingerTable[0].Node, "ChordPredecessorRequest", new Document(), true);
+                    message = new Message(_successor.Node, "ChordPredecessorRequest", new Document(), true);
                     _chordLock.ExitReadLock();
                     SendMessage(message);
                     message.BlockUntilDone();
@@ -317,12 +300,12 @@ namespace DatabaseV2.Networking
 
                 _chordLock.EnterWriteLock();
 
-                if (predecessor.Node.Hostname != string.Empty && IsBetween(predecessor.ChordId, _self.ChordId, _fingerTable[0].ChordId))
+                if (predecessor.Node.Hostname != string.Empty && IsBetween(predecessor.ChordId, _self.ChordId, _successor.ChordId))
                 {
-                    _fingerTable[0] = predecessor;
-                    if (!Equals(_fingerTable[0], _self) && !Connect(_fingerTable[0].Node))
+                    _successor = predecessor;
+                    if (!Equals(_successor, _self) && !Connect(_successor.Node))
                     {
-                        _fingerTable[0] = _self;
+                        _successor = _self;
                     }
                 }
 
@@ -330,37 +313,16 @@ namespace DatabaseV2.Networking
 
                 _chordLock.EnterReadLock();
 
-                if (!Equals(_fingerTable[0], _self))
+                if (!Equals(_successor, _self))
                 {
                     Document responseData = new Document();
                     responseData["Node"] = new DocumentEntry("Node", _self.Node.ConnectionName, DocumentEntryType.String);
                     responseData["ChordId"] = new DocumentEntry("ChordId", _self.ChordId, DocumentEntryType.Int64);
-                    message = new Message(_fingerTable[0].Node, "ChordNotify", responseData, false);
+                    message = new Message(_successor.Node, "ChordNotify", responseData, false);
                     SendMessage(message);
                 }
 
                 _chordLock.ExitReadLock();
-
-                // Fix the finger table
-                _nextFingerNode++;
-                if (_nextFingerNode >= 32)
-                {
-                    _nextFingerNode = 1;
-                }
-
-                var node = FindSuccessor(_self.ChordId + ((uint)1 << (_nextFingerNode - 1)));
-                if (node != null)
-                {
-                    _chordLock.EnterWriteLock();
-
-                    _fingerTable[_nextFingerNode] = node;
-                    if (!Connect(node.Node))
-                    {
-                        _fingerTable[_nextFingerNode] = null;
-                    }
-
-                    _chordLock.ExitWriteLock();
-                }
             }
         }
 

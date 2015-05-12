@@ -1,4 +1,5 @@
-﻿using Library.Networking;
+﻿using Library;
+using Library.Networking;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -85,10 +86,9 @@ namespace Driver
         /// </summary>
         private void RunReconnection()
         {
+            ThreadHelper.ResponsiveSleep(5000, () => _running);
             while (_running)
             {
-                Thread.Sleep(5000);
-
                 foreach (var item in _nodes)
                 {
                     if (!_network.IsConnected(item))
@@ -96,6 +96,8 @@ namespace Driver
                         _network.Connect(item);
                     }
                 }
+
+                ThreadHelper.ResponsiveSleep(5000, () => _running);
             }
         }
 

@@ -190,7 +190,7 @@ namespace Library.Networking
         /// <returns>A list of the connected nodes.</returns>
         public IEnumerable<NodeDefinition> GetConnectedNodes()
         {
-            return _outgoingConnections.Select(e => e.Key);
+            return GetOutgoingConnectedNodes().Union(GetIncomingConnectedNodes());
         }
 
         /// <summary>
@@ -260,6 +260,22 @@ namespace Library.Networking
                     _disposed = true;
                 }
             }
+        }
+
+        protected IEnumerable<NodeDefinition> GetIncomingConnectedNodes()
+        {
+            _incomingConnectionsLock.EnterReadLock();
+            var ret = _incomingConnections.Select(e => e.Key).ToList();
+            _incomingConnectionsLock.ExitReadLock();
+            return ret;
+        }
+
+        protected IEnumerable<NodeDefinition> GetOutgoingConnectedNodes()
+        {
+            _outgoingConnectionsLock.EnterReadLock();
+            var ret = _outgoingConnections.Select(e => e.Key).ToList();
+            _outgoingConnectionsLock.ExitReadLock();
+            return ret;
         }
 
         /// <summary>
@@ -572,10 +588,9 @@ namespace Library.Networking
         /// </summary>
         private void RunCleaner()
         {
+            ThreadHelper.ResponsiveSleep(5000, () => Running);
             while (Running)
             {
-                Thread.Sleep(5000);
-
                 Monitor.Enter(_messagesReceived);
 
                 CleanConnections(_outgoingConnectionsLock, _outgoingConnections, ConnectionType.Outgoing);
@@ -598,6 +613,8 @@ namespace Library.Networking
                 removedMessages.ForEach(e => _waitingForResponses.Remove(e));
 
                 Monitor.Exit(_waitingForResponses);
+
+                ThreadHelper.ResponsiveSleep(5000, () => Running);
             }
         }
 
@@ -606,10 +623,9 @@ namespace Library.Networking
         /// </summary>
         private void RunHeartbeat()
         {
+            ThreadHelper.ResponsiveSleep(5000, () => Running);
             while (Running)
             {
-                Thread.Sleep(5000);
-
                 List<Message> messages = new List<Message>();
                 _outgoingConnectionsLock.EnterReadLock();
 
@@ -634,6 +650,8 @@ namespace Library.Networking
                 _incomingConnectionsLock.ExitReadLock();
 
                 messages.ForEach(e => e.BlockUntilDone());
+
+                ThreadHelper.ResponsiveSleep(5000, () => Running);
             }
         }
 

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Net;
 
 namespace Library.Networking
@@ -6,7 +7,7 @@ namespace Library.Networking
     /// <summary>
     /// Represents the definition of a node.
     /// </summary>
-    public class NodeDefinition
+    public class NodeDefinition : IComparable, IComparer<NodeDefinition>
     {
         /// <summary>
         /// The full connection name of the node.
@@ -84,6 +85,29 @@ namespace Library.Networking
         public int Port
         {
             get { return _port; }
+        }
+
+        /// <inheritdoc />
+        public int Compare(NodeDefinition x, NodeDefinition y)
+        {
+            return string.Compare(x._connectionName, y._connectionName, StringComparison.Ordinal);
+        }
+
+        /// <inheritdoc />
+        public int CompareTo(object obj)
+        {
+            if (obj == null)
+            {
+                return 1;
+            }
+
+            NodeDefinition node = obj as NodeDefinition;
+            if (node != null)
+            {
+                return string.Compare(_connectionName, node._connectionName, StringComparison.Ordinal);
+            }
+
+            throw new ArgumentException("Object is not a NodeDefinition");
         }
 
         /// <inheritdoc />

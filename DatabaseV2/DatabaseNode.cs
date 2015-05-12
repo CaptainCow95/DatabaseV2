@@ -1,5 +1,4 @@
-﻿using DatabaseV2.Networking;
-using Library.Logging;
+﻿using Library.Logging;
 using System;
 using System.Collections.Specialized;
 using System.Net;
@@ -16,7 +15,7 @@ namespace DatabaseV2
         /// <summary>
         /// The chord network to use as a backend.
         /// </summary>
-        private readonly ChordNetwork _network;
+        private readonly DatabaseNetwork _network;
 
         /// <summary>
         /// The settings of the database.
@@ -47,7 +46,7 @@ namespace DatabaseV2
             _settings = settings;
 
             Logger.Init(_settings.LogLocation, _settings.LogLevel);
-            _network = new ChordNetwork(_settings.Port, _settings.Nodes);
+            _network = new DatabaseNetwork(_settings.Port, _settings.Nodes);
 
             if (_settings.EnableWebInterface)
             {
@@ -150,13 +149,8 @@ namespace DatabaseV2
             builder.Append("<html><body>");
             builder.Append("<b>Predecessor:</b> ");
             builder.Append(_network.Predecessor == null ? "null" : _network.Predecessor.ConnectionName);
-
-            builder.Append("<br/><br/><b>Finger Table:</b>");
-            foreach (var finger in _network.FingerTable)
-            {
-                builder.Append("<br/>");
-                builder.Append(finger == null ? "null" : finger.ConnectionName);
-            }
+            builder.Append("<br/><b>Successor:</b> ");
+            builder.Append(_network.Successor == null ? "null" : _network.Successor.ConnectionName);
 
             builder.Append("</body></html>");
             return builder.ToString();
@@ -207,12 +201,12 @@ namespace DatabaseV2
                 page = page.Substring(0, page.IndexOf('?'));
             }
 
-            if (page.EndsWith("/"))
+            if (page.EndsWith("/", StringComparison.Ordinal))
             {
                 page = page.Substring(0, page.Length - 1);
             }
 
-            if (page.StartsWith("/"))
+            if (page.StartsWith("/", StringComparison.Ordinal))
             {
                 page = page.Substring(1);
             }
