@@ -227,9 +227,22 @@ namespace Library.Data
         }
 
         /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            Document doc = obj as Document;
+            return doc != null && _data.Equals(doc._data);
+        }
+
+        /// <inheritdoc />
         public IEnumerator<KeyValuePair<string, DocumentEntry>> GetEnumerator()
         {
             return _data.GetEnumerator();
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return _data.GetHashCode();
         }
 
         /// <inheritdoc />
@@ -262,6 +275,12 @@ namespace Library.Data
             }
 
             return builder.ToString();
+        }
+
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            return ToJson();
         }
 
         /// <summary>

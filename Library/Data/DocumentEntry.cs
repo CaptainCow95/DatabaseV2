@@ -127,6 +127,75 @@ namespace Library.Data
         }
 
         /// <summary>
+        /// Converts a <see cref="bool"/> to a <see cref="DocumentEntry"/>.
+        /// </summary>
+        /// <param name="value">The value to convert.</param>
+        /// <returns>The <see cref="DocumentEntry"/> representing the value.</returns>
+        public static implicit operator DocumentEntry(bool value)
+        {
+            return new DocumentEntry(value);
+        }
+
+        /// <summary>
+        /// Converts a <see cref="double"/> to a <see cref="DocumentEntry"/>.
+        /// </summary>
+        /// <param name="value">The value to convert.</param>
+        /// <returns>The <see cref="DocumentEntry"/> representing the value.</returns>
+        public static implicit operator DocumentEntry(double value)
+        {
+            return new DocumentEntry(value);
+        }
+
+        /// <summary>
+        /// Converts a <see cref="Document"/> to a <see cref="DocumentEntry"/>.
+        /// </summary>
+        /// <param name="value">The value to convert.</param>
+        /// <returns>The <see cref="DocumentEntry"/> representing the value.</returns>
+        public static implicit operator DocumentEntry(Document value)
+        {
+            return new DocumentEntry(value);
+        }
+
+        /// <summary>
+        /// Converts a <see cref="string"/> to a <see cref="DocumentEntry"/>.
+        /// </summary>
+        /// <param name="value">The value to convert.</param>
+        /// <returns>The <see cref="DocumentEntry"/> representing the value.</returns>
+        public static implicit operator DocumentEntry(string value)
+        {
+            return new DocumentEntry(value);
+        }
+
+        /// <summary>
+        /// Converts a <see cref="long"/> to a <see cref="DocumentEntry"/>.
+        /// </summary>
+        /// <param name="value">The value to convert.</param>
+        /// <returns>The <see cref="DocumentEntry"/> representing the value.</returns>
+        public static implicit operator DocumentEntry(long value)
+        {
+            return new DocumentEntry(value);
+        }
+
+        /// <inheritdoc />
+        public override bool Equals(object obj)
+        {
+            DocumentEntry entry = obj as DocumentEntry;
+            return entry != null && _valueType == entry._valueType && _value.Equals(entry._value);
+        }
+
+        /// <inheritdoc />
+        public override int GetHashCode()
+        {
+            return _value.GetHashCode();
+        }
+
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            return _value.ToString();
+        }
+
+        /// <summary>
         /// Gets the value as an array.
         /// </summary>
         /// <returns>The value as an array.</returns>
