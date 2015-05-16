@@ -47,6 +47,10 @@
   <ItemGroup>
     <Compile Include="ControllerNode.cs" />
     <Compile Include="DatabaseNode.cs" />
+    <Compile Include="Database\ChunkDefinition.cs" />
+    <Compile Include="Database\ChunkMarker.cs" />
+    <Compile Include="Database\ChunkMarkerType.cs" />
+    <Compile Include="Database\DatabaseLookup.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Settings.cs" />
