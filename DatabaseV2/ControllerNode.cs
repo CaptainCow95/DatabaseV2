@@ -144,7 +144,7 @@ namespace DatabaseV2
             _network.Shutdown();
             _webInterface.Disable();
 
-            if (!_maintenanceThread.Join(1000))
+            if (!_maintenanceThread.Join(5000))
             {
                 _maintenanceThread.Abort();
             }
