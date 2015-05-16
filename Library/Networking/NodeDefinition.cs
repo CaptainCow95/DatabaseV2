@@ -122,5 +122,11 @@ namespace Library.Networking
         {
             return _connectionName.GetHashCode();
         }
+
+        /// <inheritdoc />
+        public override string ToString()
+        {
+            return _connectionName;
+        }
     }
 }

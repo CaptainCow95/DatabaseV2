@@ -13,6 +13,11 @@ namespace DatabaseV2
     public class WebInterface : IDisposable
     {
         /// <summary>
+        /// The object to lock on when operating on the listener.
+        /// </summary>
+        private readonly object _listenerLockObject = new object();
+
+        /// <summary>
         /// The network to display information about.
         /// </summary>
         private readonly Network _network;
@@ -41,7 +46,7 @@ namespace DatabaseV2
         /// </summary>
         public void Disable()
         {
-            lock (_listener)
+            lock (_listenerLockObject)
             {
                 if (_listener != null)
                 {
@@ -65,7 +70,7 @@ namespace DatabaseV2
         public void Enable(int port)
         {
             Logger.Log("Enabling the web interface on port " + port, LogLevel.Info);
-            lock (_listener)
+            lock (_listenerLockObject)
             {
                 try
                 {
@@ -95,7 +100,7 @@ namespace DatabaseV2
             {
                 if (disposing)
                 {
-                    lock (_listener)
+                    lock (_listenerLockObject)
                     {
                         ((IDisposable)_listener).Dispose();
                     }
@@ -195,7 +200,7 @@ namespace DatabaseV2
         private void ProcessWebRequest(IAsyncResult result)
         {
             HttpListenerContext context;
-            lock (_listener)
+            lock (_listenerLockObject)
             {
                 if (_listener.IsListening)
                 {
@@ -225,7 +230,7 @@ namespace DatabaseV2
 
             NameValueCollection queryString = context.Request.QueryString;
 
-            lock (_listener)
+            lock (_listenerLockObject)
             {
                 if (_listener.IsListening)
                 {

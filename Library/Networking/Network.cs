@@ -369,11 +369,19 @@ namespace Library.Networking
         private void DisconnectInternal(NodeDefinition definition)
         {
             _outgoingConnectionsLock.EnterWriteLock();
-            bool removed = _outgoingConnections.Remove(definition);
+
+            if (_outgoingConnections.ContainsKey(definition) && _outgoingConnections[definition].Status == ConnectionStatus.Verifying)
+            {
+                _outgoingConnectionsLock.ExitWriteLock();
+                return;
+            }
+
+            var removed = _outgoingConnections.Remove(definition);
+
             _outgoingConnectionsLock.ExitWriteLock();
 
             _incomingConnectionsLock.EnterWriteLock();
-            removed = removed || _incomingConnections.Remove(definition);
+            removed |= _incomingConnections.Remove(definition);
             _incomingConnectionsLock.ExitWriteLock();
 
             if (removed)
