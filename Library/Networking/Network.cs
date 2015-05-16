@@ -15,9 +15,9 @@ namespace Library.Networking
     public class Network : IDisposable
     {
         /// <summary>
-        /// The connection cleaner thread.
+        /// A list of the nodes to try to reconnect to.
         /// </summary>
-        private readonly Thread _cleanerThread;
+        private readonly List<NodeDefinition> _connectedNodes = new List<NodeDefinition>();
 
         /// <summary>
         /// The heartbeat thread.
@@ -38,6 +38,11 @@ namespace Library.Networking
         /// The incoming connection listener.
         /// </summary>
         private readonly TcpListener _listener;
+
+        /// <summary>
+        /// The connection maintenance thread.
+        /// </summary>
+        private readonly Thread _maintenanceThread;
 
         /// <summary>
         /// The thread pool used to receive messages.
@@ -97,8 +102,8 @@ namespace Library.Networking
             _messageReceivingThread = new Thread(ReceiveMessages);
             _messageReceivingThread.Start();
 
-            _cleanerThread = new Thread(RunCleaner);
-            _cleanerThread.Start();
+            _maintenanceThread = new Thread(RunMaintenance);
+            _maintenanceThread.Start();
 
             _heartbeatThread = new Thread(RunHeartbeat);
             _heartbeatThread.Start();
@@ -108,7 +113,7 @@ namespace Library.Networking
         /// Initializes a new instance of the <see cref="Network"/> class.
         /// </summary>
         /// <param name="port">The port to listen for connections on.</param>
-        protected Network(int port)
+        public Network(int port)
             : this()
         {
             _port = port;
@@ -148,35 +153,29 @@ namespace Library.Networking
         /// <returns>True if the connection was established, otherwise false.</returns>
         public bool Connect(NodeDefinition definition)
         {
-            _outgoingConnectionsLock.EnterReadLock();
-            if (_outgoingConnections.ContainsKey(definition) && _outgoingConnections[definition].Status != ConnectionStatus.Disconnected)
+            lock (_connectedNodes)
             {
-                _outgoingConnectionsLock.ExitReadLock();
-                return true;
+                if (!_connectedNodes.Contains(definition))
+                {
+                    _connectedNodes.Add(definition);
+                }
             }
 
-            _outgoingConnectionsLock.ExitReadLock();
-            Document messageData = new Document
-            {
-                { "Address", new NodeDefinition("localhost", _port).ConnectionName }
-            };
-            messageData["Address"] = new DocumentEntry(new NodeDefinition("localhost", _port).ConnectionName);
-            var message = new Message(definition, "JoinRequest", messageData, true)
-            {
-                RequireSecureConnection = false
-            };
+            return ConnectInternal(definition);
+        }
 
-            SendMessage(message);
-            message.BlockUntilDone();
-            if (!message.Success)
+        /// <summary>
+        /// Disconnects from a specified node.
+        /// </summary>
+        /// <param name="definition">The node to disconnect from.</param>
+        public void Disconnect(NodeDefinition definition)
+        {
+            lock (_connectedNodes)
             {
-                return false;
+                _connectedNodes.Remove(definition);
             }
 
-            _outgoingConnectionsLock.EnterReadLock();
-            _outgoingConnections[definition].ConnectionEstablished();
-            _outgoingConnectionsLock.ExitReadLock();
-            return true;
+            DisconnectInternal(definition);
         }
 
         /// <summary>
@@ -241,7 +240,7 @@ namespace Library.Networking
 
             _heartbeatThread.Join();
             _messageReceivingThread.Join();
-            _cleanerThread.Join();
+            _maintenanceThread.Join();
             _messageReceivedPool.Shutdown();
             _messageSendPool.Shutdown();
         }
@@ -308,46 +307,106 @@ namespace Library.Networking
         }
 
         /// <summary>
-        /// Cleans up disconnected connections.
+        /// Connects to the specified node.
         /// </summary>
-        /// <param name="connectionsLock">The connections lock.</param>
-        /// <param name="connections">The connection list.</param>
-        /// <param name="type">The type of the connection.</param>
-        private void CleanConnections(ReaderWriterLockSlim connectionsLock, Dictionary<NodeDefinition, Connection> connections, ConnectionType type)
+        /// <param name="definition">The node to connect to.</param>
+        /// <returns>True if the connection was established, otherwise false.</returns>
+        private bool ConnectInternal(NodeDefinition definition)
         {
-            connectionsLock.EnterWriteLock();
-            List<NodeDefinition> removedConnections = new List<NodeDefinition>();
-            removedConnections.Clear();
-            removedConnections.AddRange(connections.Where(e => e.Value.Status == ConnectionStatus.Disconnected).Select(e => e.Key));
-            removedConnections.ForEach(e => connections.Remove(e));
-            connectionsLock.ExitWriteLock();
-
-            foreach (var item in removedConnections)
+            _outgoingConnectionsLock.EnterUpgradeableReadLock();
+            if (_outgoingConnections.ContainsKey(definition))
             {
-                _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(item, type));
-                HandleDisconnection(item);
+                _outgoingConnectionsLock.ExitUpgradeableReadLock();
+                return true;
+            }
+
+            _outgoingConnectionsLock.EnterWriteLock();
+
+            bool success = true;
+            try
+            {
+                TcpClient client = new TcpClient(definition.Hostname, definition.Port);
+                _outgoingConnections.Add(definition, new Connection(client));
+            }
+            catch
+            {
+                success = false;
+            }
+
+            _outgoingConnectionsLock.ExitWriteLock();
+            _outgoingConnectionsLock.ExitUpgradeableReadLock();
+
+            if (!success)
+            {
+                return false;
+            }
+
+            Document messageData = new Document
+            {
+                { "Address", new NodeDefinition("localhost", _port).ConnectionName }
+            };
+            messageData["Address"] = new DocumentEntry(new NodeDefinition("localhost", _port).ConnectionName);
+            var message = new Message(definition, "JoinRequest", messageData, true)
+            {
+                RequireSecureConnection = false
+            };
+
+            SendMessage(message);
+            message.BlockUntilDone();
+            if (!message.Success)
+            {
+                return false;
+            }
+
+            _outgoingConnectionsLock.EnterReadLock();
+            _outgoingConnections[definition].ConnectionEstablished();
+            _outgoingConnectionsLock.ExitReadLock();
+            return true;
+        }
+
+        /// <summary>
+        /// Disconnects from a specified node.
+        /// </summary>
+        /// <param name="definition">The node to disconnect from.</param>
+        private void DisconnectInternal(NodeDefinition definition)
+        {
+            _outgoingConnectionsLock.EnterWriteLock();
+            bool removed = _outgoingConnections.Remove(definition);
+            _outgoingConnectionsLock.ExitWriteLock();
+
+            _incomingConnectionsLock.EnterWriteLock();
+            removed = removed || _incomingConnections.Remove(definition);
+            _incomingConnectionsLock.ExitWriteLock();
+
+            lock (_messagesReceived)
+            {
+                _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(definition, ConnectionType.Outgoing));
+                _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(definition, ConnectionType.Incoming));
+            }
+
+            if (removed)
+            {
+                HandleDisconnection(definition);
                 if (Disconnection != null)
                 {
-                    Disconnection(this, new DisconnectionEventArgs(item));
+                    Disconnection(this, new DisconnectionEventArgs(definition));
                 }
             }
 
-            Monitor.Enter(_waitingForResponses);
-            List<uint> removedMessages = new List<uint>();
-            foreach (var connection in removedConnections)
+            lock (_waitingForResponses)
             {
+                List<uint> removedMessages = new List<uint>();
                 foreach (var message in _waitingForResponses)
                 {
-                    if (message.Value.Address.Equals(connection))
+                    if (message.Value.Address.Equals(definition))
                     {
                         message.Value.Status = MessageStatus.ResponseFailure;
                         removedMessages.Add(message.Key);
                     }
                 }
-            }
 
-            removedMessages.ForEach(e => _waitingForResponses.Remove(e));
-            Monitor.Exit(_waitingForResponses);
+                removedMessages.ForEach(e => _waitingForResponses.Remove(e));
+            }
         }
 
         /// <summary>
@@ -392,22 +451,21 @@ namespace Library.Networking
 
             if (message.InResponseTo != 0)
             {
-                Monitor.Enter(_waitingForResponses);
-
-                if (_waitingForResponses.ContainsKey(message.InResponseTo))
+                lock (_waitingForResponses)
                 {
-                    Message waiting = _waitingForResponses[message.InResponseTo];
-                    waiting.Response = message;
-                    waiting.Status = MessageStatus.ResponseReceived;
-                    if (waiting.ResponseCallback != null)
+                    if (_waitingForResponses.ContainsKey(message.InResponseTo))
                     {
-                        _messageReceivedPool.QueueWorkItem(waiting.ResponseCallback, waiting);
+                        Message waiting = _waitingForResponses[message.InResponseTo];
+                        waiting.Response = message;
+                        waiting.Status = MessageStatus.ResponseReceived;
+                        if (waiting.ResponseCallback != null)
+                        {
+                            _messageReceivedPool.QueueWorkItem(waiting.ResponseCallback, waiting);
+                        }
+
+                        _waitingForResponses.Remove(message.InResponseTo);
                     }
-
-                    _waitingForResponses.Remove(message.InResponseTo);
                 }
-
-                Monitor.Exit(_waitingForResponses);
             }
             else
             {
@@ -452,34 +510,37 @@ namespace Library.Networking
             while (Running)
             {
                 List<Tuple<NodeDefinition, ConnectionType, byte[]>> messages = new List<Tuple<NodeDefinition, ConnectionType, byte[]>>();
-                Monitor.Enter(_messagesReceived);
+
                 _outgoingConnectionsLock.EnterReadLock();
 
-                foreach (var connection in _outgoingConnections)
+                lock (_messagesReceived)
                 {
-                    if (!connection.Value.Client.Connected)
+                    foreach (var connection in _outgoingConnections)
                     {
-                        continue;
-                    }
-
-                    var key = new Tuple<NodeDefinition, ConnectionType>(connection.Key, ConnectionType.Outgoing);
-                    if (!_messagesReceived.ContainsKey(key))
-                    {
-                        _messagesReceived.Add(key, new List<byte>(1024));
-                    }
-
-                    try
-                    {
-                        NetworkStream stream = connection.Value.Client.GetStream();
-                        while (stream.DataAvailable)
+                        if (!connection.Value.Client.Connected)
                         {
-                            int bytesRead = stream.Read(messageBuffer, 0, 1024);
-                            _messagesReceived[key].AddRange(messageBuffer.Take(bytesRead));
+                            continue;
                         }
-                    }
-                    catch
-                    {
-                        // The stream was closed, do nothing.
+
+                        var key = new Tuple<NodeDefinition, ConnectionType>(connection.Key, ConnectionType.Outgoing);
+                        if (!_messagesReceived.ContainsKey(key))
+                        {
+                            _messagesReceived.Add(key, new List<byte>(1024));
+                        }
+
+                        try
+                        {
+                            NetworkStream stream = connection.Value.Client.GetStream();
+                            while (stream.DataAvailable)
+                            {
+                                int bytesRead = stream.Read(messageBuffer, 0, 1024);
+                                _messagesReceived[key].AddRange(messageBuffer.Take(bytesRead));
+                            }
+                        }
+                        catch
+                        {
+                            // The stream was closed, do nothing.
+                        }
                     }
                 }
 
@@ -487,54 +548,58 @@ namespace Library.Networking
 
                 _incomingConnectionsLock.EnterReadLock();
 
-                foreach (var connection in _incomingConnections)
+                lock (_messagesReceived)
                 {
-                    if (!connection.Value.Client.Connected)
+                    foreach (var connection in _incomingConnections)
                     {
-                        continue;
-                    }
-
-                    var key = new Tuple<NodeDefinition, ConnectionType>(connection.Key, ConnectionType.Incoming);
-                    if (!_messagesReceived.ContainsKey(key))
-                    {
-                        _messagesReceived.Add(key, new List<byte>(1024));
-                    }
-
-                    try
-                    {
-                        NetworkStream stream = connection.Value.Client.GetStream();
-                        while (stream.DataAvailable)
+                        if (!connection.Value.Client.Connected)
                         {
-                            int bytesRead = stream.Read(messageBuffer, 0, 1024);
-                            _messagesReceived[key].AddRange(messageBuffer.Take(bytesRead));
+                            continue;
                         }
-                    }
-                    catch
-                    {
-                        // The stream was closed, do nothing.
+
+                        var key = new Tuple<NodeDefinition, ConnectionType>(connection.Key, ConnectionType.Incoming);
+                        if (!_messagesReceived.ContainsKey(key))
+                        {
+                            _messagesReceived.Add(key, new List<byte>(1024));
+                        }
+
+                        try
+                        {
+                            NetworkStream stream = connection.Value.Client.GetStream();
+                            while (stream.DataAvailable)
+                            {
+                                int bytesRead = stream.Read(messageBuffer, 0, 1024);
+                                _messagesReceived[key].AddRange(messageBuffer.Take(bytesRead));
+                            }
+                        }
+                        catch
+                        {
+                            // The stream was closed, do nothing.
+                        }
                     }
                 }
 
                 _incomingConnectionsLock.ExitReadLock();
 
-                foreach (var message in _messagesReceived)
+                lock (_messagesReceived)
                 {
-                    while (message.Value.Count >= 4)
+                    foreach (var message in _messagesReceived)
                     {
-                        int length = BitConverter.ToInt32(message.Value.Take(4).ToArray(), 0);
-                        if (message.Value.Count >= length + 4)
+                        while (message.Value.Count >= 4)
                         {
-                            messages.Add(new Tuple<NodeDefinition, ConnectionType, byte[]>(message.Key.Item1, message.Key.Item2, message.Value.Skip(4).Take(length).ToArray()));
-                            message.Value.RemoveRange(0, length + 4);
-                        }
-                        else
-                        {
-                            break;
+                            int length = BitConverter.ToInt32(message.Value.Take(4).ToArray(), 0);
+                            if (message.Value.Count >= length + 4)
+                            {
+                                messages.Add(new Tuple<NodeDefinition, ConnectionType, byte[]>(message.Key.Item1, message.Key.Item2, message.Value.Skip(4).Take(length).ToArray()));
+                                message.Value.RemoveRange(0, length + 4);
+                            }
+                            else
+                            {
+                                break;
+                            }
                         }
                     }
                 }
-
-                Monitor.Exit(_messagesReceived);
 
                 foreach (var message in messages)
                 {
@@ -557,72 +622,39 @@ namespace Library.Networking
                 return;
             }
 
-            Monitor.Enter(_messagesReceived);
             _incomingConnectionsLock.EnterWriteLock();
 
-            if (_incomingConnections.ContainsKey(currentName))
+            lock (_messagesReceived)
             {
-                if (_incomingConnections.ContainsKey(newName))
+                if (_incomingConnections.ContainsKey(currentName))
                 {
-                    _incomingConnections.Remove(newName);
-                }
+                    if (_incomingConnections.ContainsKey(newName))
+                    {
+                        _incomingConnections.Remove(newName);
+                    }
 
-                var messagesKey = new Tuple<NodeDefinition, ConnectionType>(newName, ConnectionType.Incoming);
-                if (_messagesReceived.ContainsKey(messagesKey))
-                {
-                    _messagesReceived.Remove(messagesKey);
-                }
+                    var messagesKey = new Tuple<NodeDefinition, ConnectionType>(newName, ConnectionType.Incoming);
+                    if (_messagesReceived.ContainsKey(messagesKey))
+                    {
+                        _messagesReceived.Remove(messagesKey);
+                    }
 
-                var connection = _incomingConnections[currentName];
-                _incomingConnections.Remove(currentName);
-                _incomingConnections.Add(newName, connection);
+                    var connection = _incomingConnections[currentName];
+                    _incomingConnections.Remove(currentName);
+                    _incomingConnections.Add(newName, connection);
 
-                messagesKey = new Tuple<NodeDefinition, ConnectionType>(currentName, ConnectionType.Incoming);
-                if (_messagesReceived.ContainsKey(messagesKey))
-                {
-                    var messageList = _messagesReceived[messagesKey];
-                    _messagesReceived.Remove(messagesKey);
-                    _messagesReceived.Add(new Tuple<NodeDefinition, ConnectionType>(newName, ConnectionType.Incoming), messageList);
+                    messagesKey = new Tuple<NodeDefinition, ConnectionType>(currentName, ConnectionType.Incoming);
+                    if (_messagesReceived.ContainsKey(messagesKey))
+                    {
+                        var messageList = _messagesReceived[messagesKey];
+                        _messagesReceived.Remove(messagesKey);
+                        _messagesReceived.Add(
+                            new Tuple<NodeDefinition, ConnectionType>(newName, ConnectionType.Incoming), messageList);
+                    }
                 }
             }
 
             _incomingConnectionsLock.ExitWriteLock();
-            Monitor.Exit(_messagesReceived);
-        }
-
-        /// <summary>
-        /// Cleans up any disconnected connections and expired messages.
-        /// </summary>
-        private void RunCleaner()
-        {
-            ThreadHelper.ResponsiveSleep(5000, () => Running);
-            while (Running)
-            {
-                Monitor.Enter(_messagesReceived);
-
-                CleanConnections(_outgoingConnectionsLock, _outgoingConnections, ConnectionType.Outgoing);
-                CleanConnections(_incomingConnectionsLock, _incomingConnections, ConnectionType.Incoming);
-
-                Monitor.Exit(_messagesReceived);
-
-                Monitor.Enter(_waitingForResponses);
-
-                List<uint> removedMessages = new List<uint>();
-                foreach (var message in _waitingForResponses)
-                {
-                    if (message.Value.ExpireTime < DateTime.UtcNow)
-                    {
-                        message.Value.Status = MessageStatus.ResponseTimeout;
-                        removedMessages.Add(message.Key);
-                    }
-                }
-
-                removedMessages.ForEach(e => _waitingForResponses.Remove(e));
-
-                Monitor.Exit(_waitingForResponses);
-
-                ThreadHelper.ResponsiveSleep(5000, () => Running);
-            }
         }
 
         /// <summary>
@@ -666,6 +698,38 @@ namespace Library.Networking
         }
 
         /// <summary>
+        /// Cleans up any disconnected connections and expired messages.
+        /// </summary>
+        private void RunMaintenance()
+        {
+            ThreadHelper.ResponsiveSleep(5000, () => Running);
+            while (Running)
+            {
+                lock (_waitingForResponses)
+                {
+                    List<uint> removedMessages = new List<uint>();
+                    foreach (var message in _waitingForResponses)
+                    {
+                        if (message.Value.ExpireTime < DateTime.UtcNow)
+                        {
+                            message.Value.Status = MessageStatus.ResponseTimeout;
+                            removedMessages.Add(message.Key);
+                        }
+                    }
+
+                    removedMessages.ForEach(e => _waitingForResponses.Remove(e));
+                }
+
+                foreach (var n in _connectedNodes.Except(GetOutgoingConnectedNodes()))
+                {
+                    ConnectInternal(n);
+                }
+
+                ThreadHelper.ResponsiveSleep(1000, () => Running);
+            }
+        }
+
+        /// <summary>
         /// Sends a message to a node.
         /// </summary>
         /// <param name="message">The message to send.</param>
@@ -676,16 +740,16 @@ namespace Library.Networking
         {
             lockObject.EnterReadLock();
 
-            if (connections.ContainsKey(message.Address) &&
-                (connections[message.Address].Status == ConnectionStatus.Connected || !message.RequireSecureConnection))
+            if (connections.ContainsKey(message.Address) && (connections[message.Address].Status == ConnectionStatus.Connected || !message.RequireSecureConnection))
             {
                 try
                 {
                     if (message.WaitingForResponse)
                     {
-                        Monitor.Enter(_waitingForResponses);
-                        _waitingForResponses.Add(message.Id, message);
-                        Monitor.Exit(_waitingForResponses);
+                        lock (_waitingForResponses)
+                        {
+                            _waitingForResponses.Add(message.Id, message);
+                        }
                     }
 
                     byte[] dataToSend = message.EncodeMessage();
@@ -697,21 +761,16 @@ namespace Library.Networking
                 catch
                 {
                     message.Status = MessageStatus.SendingFailure;
-                    connections[message.Address].Disconnected();
 
-                    Monitor.Enter(_waitingForResponses);
-                    _waitingForResponses.Remove(message.Id);
-                    Monitor.Exit(_waitingForResponses);
+                    lock (_waitingForResponses)
+                    {
+                        _waitingForResponses.Remove(message.Id);
+                    }
                 }
             }
             else
             {
                 message.Status = MessageStatus.SendingFailure;
-
-                if (connections.ContainsKey(message.Address))
-                {
-                    connections[message.Address].Disconnected();
-                }
             }
 
             lockObject.ExitReadLock();
@@ -729,40 +788,6 @@ namespace Library.Networking
                 return;
             }
 
-            bool createConnection = false;
-            if (message.Type == ConnectionType.Outgoing)
-            {
-                _outgoingConnectionsLock.EnterReadLock();
-
-                if (!message.RequireSecureConnection && !_outgoingConnections.ContainsKey(message.Address))
-                {
-                    createConnection = true;
-                }
-
-                _outgoingConnectionsLock.ExitReadLock();
-            }
-
-            if (createConnection)
-            {
-                try
-                {
-                    TcpClient client = new TcpClient(message.Address.Hostname, message.Address.Port);
-
-                    _outgoingConnectionsLock.EnterWriteLock();
-
-                    if (!_outgoingConnections.ContainsKey(message.Address))
-                    {
-                        _outgoingConnections.Add(message.Address, new Connection(client));
-                    }
-
-                    _outgoingConnectionsLock.ExitWriteLock();
-                }
-                catch
-                {
-                    message.Status = MessageStatus.SendingFailure;
-                }
-            }
-
             if (message.Type == ConnectionType.Outgoing)
             {
                 SendMessageToNode(message, _outgoingConnectionsLock, _outgoingConnections);
@@ -770,6 +795,11 @@ namespace Library.Networking
             else
             {
                 SendMessageToNode(message, _incomingConnectionsLock, _incomingConnections);
+            }
+
+            if (message.Status == MessageStatus.SendingFailure)
+            {
+                DisconnectInternal(message.Address);
             }
         }
     }

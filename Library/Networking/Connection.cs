@@ -34,13 +34,5 @@ namespace Library.Networking
         {
             Status = ConnectionStatus.Connected;
         }
-
-        /// <summary>
-        /// Marks the connection as disconnected.
-        /// </summary>
-        public void Disconnected()
-        {
-            Status = ConnectionStatus.Disconnected;
-        }
     }
 }

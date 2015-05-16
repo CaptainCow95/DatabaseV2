@@ -148,15 +148,6 @@ namespace Library.Networking
         }
 
         /// <summary>
-        /// Gets or sets a value indicating whether an already identified connection to send the message.
-        /// </summary>
-        public bool RequireSecureConnection
-        {
-            get { return _requireSecureConnection; }
-            set { _requireSecureConnection = value; }
-        }
-
-        /// <summary>
         /// Gets or sets the response to the message.
         /// </summary>
         public Message Response { get; set; }
@@ -193,6 +184,15 @@ namespace Library.Networking
         }
 
         /// <summary>
+        /// Gets or sets a value indicating whether an already identified connection to send the message.
+        /// </summary>
+        internal bool RequireSecureConnection
+        {
+            get { return _requireSecureConnection; }
+            set { _requireSecureConnection = value; }
+        }
+
+        /// <summary>
         /// Blocks until an error occurs, the message is sent successfully if it isn't waiting for a response, or until a response is received if it is waiting for a response.
         /// </summary>
         public void BlockUntilDone()
@@ -225,16 +225,16 @@ namespace Library.Networking
         /// <returns>The next message ID.</returns>
         private static uint GetNextId()
         {
-            Monitor.Enter(NextIdLockObject);
-            ++_nextId;
-            if (_nextId == 0)
+            lock (NextIdLockObject)
             {
                 ++_nextId;
-            }
+                if (_nextId == 0)
+                {
+                    ++_nextId;
+                }
 
-            uint temp = _nextId;
-            Monitor.Exit(NextIdLockObject);
-            return temp;
+                return _nextId;
+            }
         }
     }
 }

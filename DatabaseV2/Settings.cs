@@ -81,6 +81,11 @@ namespace DatabaseV2
         }
 
         /// <summary>
+        /// Gets a value indicating whether the node is a controller node.
+        /// </summary>
+        public bool Controller { get; private set; }
+
+        /// <summary>
         /// Gets a value indicating whether the web interface should be enabled.
         /// </summary>
         public bool EnableWebInterface { get; private set; }
@@ -118,36 +123,9 @@ namespace DatabaseV2
                 string arg = ReadArgument(args, i, string.Empty).ToLowerInvariant();
                 switch (arg)
                 {
-                    case "--port":
-                    case "-p":
-                        int? port = ReadArgumentInt(args, ++i, arg + PortErrorMessage, arg + PortConversionErrorMessage);
-                        if (port.HasValue)
-                        {
-                            if (port < 1 || port > 65535)
-                            {
-                                Logger.Log(arg + PortInvalidMessage, LogLevel.Warning);
-                            }
-                            else
-                            {
-                                settings.Port = port.Value;
-                            }
-                        }
-
-                        break;
-
-                    case "--nodes":
-                    case "-n":
-                        string nodeString = ReadArgument(args, ++i, arg + NodesErrorMessage);
-                        try
-                        {
-                            settings.Nodes.AddRange(nodeString.Split(',').Select(e => new NodeDefinition(e)));
-                        }
-                        catch (ArgumentException)
-                        {
-                            settings.Nodes.Clear();
-                            Logger.Log(NodesInvalidMessage, LogLevel.Warning);
-                        }
-
+                    case "--controller":
+                    case "-c":
+                        settings.Controller = true;
                         break;
 
                     case "--enablewebinterface":
@@ -155,14 +133,9 @@ namespace DatabaseV2
                         settings.EnableWebInterface = true;
                         break;
 
-                    case "--loglocation":
-                    case "-l":
-                        string logLocation = ReadArgument(args, ++i, arg + LogLocationErrorMessage);
-                        if (logLocation != string.Empty)
-                        {
-                            settings.LogLocation = logLocation;
-                        }
-
+                    case "--help":
+                    case "-h":
+                        Console.WriteLine(HelpMessage);
                         break;
 
                     case "--loglevel":
@@ -193,9 +166,46 @@ namespace DatabaseV2
 
                         break;
 
-                    case "--help":
-                    case "-h":
-                        Console.WriteLine(HelpMessage);
+                    case "--loglocation":
+                    case "-l":
+                        string logLocation = ReadArgument(args, ++i, arg + LogLocationErrorMessage);
+                        if (logLocation != string.Empty)
+                        {
+                            settings.LogLocation = logLocation;
+                        }
+
+                        break;
+
+                    case "--nodes":
+                    case "-n":
+                        string nodeString = ReadArgument(args, ++i, arg + NodesErrorMessage);
+                        try
+                        {
+                            settings.Nodes.AddRange(nodeString.Split(',').Select(e => new NodeDefinition(e)));
+                        }
+                        catch (ArgumentException)
+                        {
+                            settings.Nodes.Clear();
+                            Logger.Log(NodesInvalidMessage, LogLevel.Warning);
+                        }
+
+                        break;
+
+                    case "--port":
+                    case "-p":
+                        int? port = ReadArgumentInt(args, ++i, arg + PortErrorMessage, arg + PortConversionErrorMessage);
+                        if (port.HasValue)
+                        {
+                            if (port < 1 || port > 65535)
+                            {
+                                Logger.Log(arg + PortInvalidMessage, LogLevel.Warning);
+                            }
+                            else
+                            {
+                                settings.Port = port.Value;
+                            }
+                        }
+
                         break;
                 }
             }

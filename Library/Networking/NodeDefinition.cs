@@ -49,7 +49,7 @@ namespace Library.Networking
                 throw new ArgumentException("Connection name is not in the correct format.", connectionName);
             }
 
-            _hostname = parts[0];
+            _hostname = parts[0].Equals("localhost", StringComparison.InvariantCultureIgnoreCase) ? Dns.GetHostName() : parts[0];
             int tempPort;
             if (int.TryParse(parts[1], out tempPort))
             {
@@ -60,7 +60,7 @@ namespace Library.Networking
                 throw new ArgumentException("Connection name is not in the correct format.", connectionName);
             }
 
-            _connectionName = connectionName;
+            _connectionName = Hostname + ":" + Port;
         }
 
         /// <summary>

@@ -2,6 +2,7 @@
 using Library.Networking;
 using System;
 using System.Collections.Specialized;
+using System.Linq;
 using System.Net;
 using System.Text;
 using System.Threading;
@@ -9,9 +10,9 @@ using System.Threading;
 namespace DatabaseV2
 {
     /// <summary>
-    /// Represents a node in the database.
+    /// Represents a controller node in the database.
     /// </summary>
-    public class DatabaseNode : IDisposable
+    public class ControllerNode : IDisposable
     {
         /// <summary>
         /// The network to use as a backend.
@@ -39,10 +40,10 @@ namespace DatabaseV2
         private HttpListener _listener;
 
         /// <summary>
-        /// Initializes a new instance of the <see cref="DatabaseNode"/> class.
+        /// Initializes a new instance of the <see cref="ControllerNode"/> class.
         /// </summary>
         /// <param name="settings">The settings to use.</param>
-        public DatabaseNode(Settings settings)
+        public ControllerNode(Settings settings)
         {
             _settings = settings;
 
@@ -55,7 +56,7 @@ namespace DatabaseV2
                 _webInterfaceThread.Start();
             }
 
-            foreach (var n in _settings.Nodes)
+            foreach (var n in _settings.Nodes.Except(new[] { new NodeDefinition("localhost", _settings.Port) }))
             {
                 _network.Connect(n);
             }

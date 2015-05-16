@@ -1,7 +1,4 @@
-﻿using Library.Logging;
-using System;
-
-namespace DatabaseV2
+﻿namespace DatabaseV2
 {
     /// <summary>
     /// The entry point of the program.
@@ -14,13 +11,16 @@ namespace DatabaseV2
         /// <param name="args">The arguments to the program.</param>
         private static void Main(string[] args)
         {
-            DatabaseNode node = new DatabaseNode(Settings.ReadCommandLineArguments(args));
-            while (Console.ReadLine() != "exit")
-            {
-            }
+            var settings = Settings.ReadCommandLineArguments(args);
 
-            Logger.Log("Shutting down...", LogLevel.Info);
-            node.Shutdown();
+            if (settings.Controller)
+            {
+                new ControllerNode(settings).Run();
+            }
+            else
+            {
+                new DatabaseNode(settings).Run();
+            }
         }
     }
 }

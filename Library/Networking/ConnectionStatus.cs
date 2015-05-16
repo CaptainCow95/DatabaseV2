@@ -14,10 +14,5 @@
         /// The connection is being identified.
         /// </summary>
         Identifying,
-
-        /// <summary>
-        /// The connection has been disconnected.
-        /// </summary>
-        Disconnected
     }
 }
