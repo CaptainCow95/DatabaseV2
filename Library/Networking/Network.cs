@@ -692,7 +692,7 @@ namespace Library.Networking
 
                 messages.ForEach(e => e.BlockUntilDone());
 
-                ThreadHelper.ResponsiveSleep(5000, () => Running);
+                ThreadHelper.ResponsiveSleep(1000, () => Running);
             }
         }
 
