@@ -193,7 +193,7 @@ namespace Library.Networking
         /// <returns>A list of the connected nodes.</returns>
         public IEnumerable<NodeDefinition> GetConnectedNodes()
         {
-            return GetOutgoingConnectedNodes().Union(GetIncomingConnectedNodes());
+            return GetOutgoingConnectedNodes();
         }
 
         /// <summary>
@@ -206,13 +206,6 @@ namespace Library.Networking
             _outgoingConnectionsLock.EnterReadLock();
             bool found = _outgoingConnections.ContainsKey(node) && _outgoingConnections[node].Status == ConnectionStatus.Connected;
             _outgoingConnectionsLock.ExitReadLock();
-
-            if (!found)
-            {
-                _incomingConnectionsLock.EnterReadLock();
-                found = _incomingConnections.ContainsKey(node) && _incomingConnections[node].Status == ConnectionStatus.Connected;
-                _incomingConnectionsLock.ExitReadLock();
-            }
 
             return found;
         }
