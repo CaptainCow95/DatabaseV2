@@ -219,6 +219,11 @@ namespace DatabaseV2
             if (settings.Nodes.Count == 0)
             {
                 Logger.Log("No nodes specified to connect to.", LogLevel.Warning);
+
+                if (settings.Controller)
+                {
+                    settings.Nodes = new List<NodeDefinition> { new NodeDefinition("localhost", settings.Port) };
+                }
             }
 
             return settings;

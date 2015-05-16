@@ -15,6 +15,11 @@ namespace DatabaseV2
     public class ControllerNode : IDisposable
     {
         /// <summary>
+        /// The amount of time to add for each additional controller node.
+        /// </summary>
+        private const int CandidateTimePerControllerNode = 5;
+
+        /// <summary>
         /// The lock to use when handling leader data.
         /// </summary>
         private readonly ReaderWriterLockSlim _leaderLock = new ReaderWriterLockSlim();
@@ -94,13 +99,13 @@ namespace DatabaseV2
                 _webInterface.Enable(_settings.Port + 1);
             }
 
-            _maintenanceThread = new Thread(RunMaintenance);
-            _maintenanceThread.Start();
-
             foreach (var n in _settings.Nodes.Except(new[] { new NodeDefinition("localhost", _settings.Port) }))
             {
                 _network.Connect(n);
             }
+
+            _maintenanceThread = new Thread(RunMaintenance);
+            _maintenanceThread.Start();
         }
 
         /// <summary>
@@ -231,7 +236,11 @@ namespace DatabaseV2
                     { "Leader", new NodeDefinition("localhost", _settings.Port).ConnectionName },
                     { "CurrentTerm", term }
                 };
-                _settings.Nodes.Except(new[] { new NodeDefinition("localhost", _settings.Port) }).ToList().ForEach(e => _network.SendMessage(new Message(e, "NewLeader", newLeaderData, false)));
+                foreach (var n in _network.GetConnectedNodes())
+                {
+                    _network.SendMessage(new Message(n, "NewLeader", newLeaderData, false));
+                }
+
                 Logger.Log("Electing self as leader.", LogLevel.Info);
             }
             else
@@ -260,12 +269,21 @@ namespace DatabaseV2
             }
 
             // Less than half of the nodes are up, there is no longer a leader
-            if ((_leader != null || _isLeader) && _network.GetConnectedNodes().Intersect(_settings.Nodes).Count() < (_settings.Nodes.Count / 2))
+            if (_isLeader && _network.GetConnectedNodes().Intersect(_settings.Nodes).Count() < (_settings.Nodes.Count / 2))
             {
                 _isLeader = false;
                 _leader = null;
                 ResetLeaderCandidateTime();
-                Logger.Log("Too few nodes to maintain leader, resetting.", LogLevel.Info);
+                Logger.Log("Too few nodes to maintain leadership, resetting.", LogLevel.Info);
+
+                Document newLeaderData = new Document
+                {
+                    { "Leader", string.Empty }
+                };
+                foreach (var n in _network.GetConnectedNodes())
+                {
+                    _network.SendMessage(new Message(n, "NewLeader", newLeaderData, false));
+                }
             }
 
             _leaderLock.ExitWriteLock();
@@ -320,7 +338,13 @@ namespace DatabaseV2
             {
                 _leaderLock.EnterWriteLock();
 
-                if (_currentTerm == e.Message.Data["CurrentTerm"].ValueAsInt64())
+                if (e.Message.Data["Leader"].ValueAsString() == string.Empty)
+                {
+                    _leader = null;
+                    _isLeader = false;
+                    Logger.Log("The previous leader has stepped down.", LogLevel.Info);
+                }
+                else if (_currentTerm == e.Message.Data["CurrentTerm"].ValueAsInt64())
                 {
                     _leader = new NodeDefinition(e.Message.Data["Leader"].ValueAsString());
                     _isLeader = false;
@@ -329,6 +353,18 @@ namespace DatabaseV2
 
                 _leaderLock.ExitWriteLock();
             }
+            else if (e.Message.MessageType == "LeaderRequest")
+            {
+                _leaderLock.EnterReadLock();
+                Document leaderData = new Document
+                {
+                    { "Leader", _leader == null ? string.Empty : _leader.ConnectionName },
+                    { "CurrentTerm", _currentTerm }
+                };
+                _leaderLock.ExitReadLock();
+
+                _network.SendMessage(new Message(e.Message, "LeaderResponse", leaderData, false));
+            }
         }
 
         /// <summary>
@@ -336,7 +372,7 @@ namespace DatabaseV2
         /// </summary>
         private void ResetLeaderCandidateTime()
         {
-            _leaderCandidateTime = DateTime.UtcNow + TimeSpan.FromSeconds(_random.Next(20, 120));
+            _leaderCandidateTime = DateTime.UtcNow + TimeSpan.FromSeconds(_random.Next(CandidateTimePerControllerNode, CandidateTimePerControllerNode * _settings.Nodes.Count));
         }
 
         /// <summary>
