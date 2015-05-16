@@ -1,5 +1,6 @@
 ﻿using Amib.Threading;
 using Library.Data;
+using Library.Logging;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -232,6 +233,7 @@ namespace Library.Networking
         /// </summary>
         public virtual void Shutdown()
         {
+            Logger.Log("Shutting down network.", LogLevel.Info);
             Running = false;
             if (_listener != null)
             {
@@ -361,6 +363,9 @@ namespace Library.Networking
             _outgoingConnectionsLock.EnterReadLock();
             _outgoingConnections[definition].ConnectionEstablished();
             _outgoingConnectionsLock.ExitReadLock();
+
+            Logger.Log("Connected to " + definition.ConnectionName + ".", LogLevel.Debug);
+
             return true;
         }
 
@@ -378,34 +383,35 @@ namespace Library.Networking
             removed = removed || _incomingConnections.Remove(definition);
             _incomingConnectionsLock.ExitWriteLock();
 
-            lock (_messagesReceived)
-            {
-                _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(definition, ConnectionType.Outgoing));
-                _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(definition, ConnectionType.Incoming));
-            }
-
             if (removed)
             {
+                lock (_messagesReceived)
+                {
+                    _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(definition, ConnectionType.Outgoing));
+                    _messagesReceived.Remove(new Tuple<NodeDefinition, ConnectionType>(definition, ConnectionType.Incoming));
+                }
+
+                Logger.Log("Disconnected from " + definition.ConnectionName + ".", LogLevel.Debug);
                 HandleDisconnection(definition);
                 if (Disconnection != null)
                 {
                     Disconnection(this, new DisconnectionEventArgs(definition));
                 }
-            }
 
-            lock (_waitingForResponses)
-            {
-                List<uint> removedMessages = new List<uint>();
-                foreach (var message in _waitingForResponses)
+                lock (_waitingForResponses)
                 {
-                    if (message.Value.Address.Equals(definition))
+                    List<uint> removedMessages = new List<uint>();
+                    foreach (var message in _waitingForResponses)
                     {
-                        message.Value.Status = MessageStatus.ResponseFailure;
-                        removedMessages.Add(message.Key);
+                        if (message.Value.Address.Equals(definition))
+                        {
+                            message.Value.Status = MessageStatus.ResponseFailure;
+                            removedMessages.Add(message.Key);
+                        }
                     }
-                }
 
-                removedMessages.ForEach(e => _waitingForResponses.Remove(e));
+                    removedMessages.ForEach(e => _waitingForResponses.Remove(e));
+                }
             }
         }
 

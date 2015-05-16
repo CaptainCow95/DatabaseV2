@@ -36,6 +36,7 @@ namespace DatabaseV2
         /// <param name="settings">The settings to use.</param>
         public ControllerNode(Settings settings)
         {
+            Logger.Log("Starting up as a controller node.", LogLevel.Info);
             _settings = settings;
 
             Logger.Init(_settings.LogLocation, _settings.LogLevel);

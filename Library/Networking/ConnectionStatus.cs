@@ -11,8 +11,8 @@
         Connected,
 
         /// <summary>
-        /// The connection is being identified.
+        /// The connection is being verified.
         /// </summary>
-        Identifying,
+        Verifying,
     }
 }

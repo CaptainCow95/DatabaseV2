@@ -14,7 +14,7 @@ namespace Library.Networking
         public Connection(TcpClient client)
         {
             Client = client;
-            Status = ConnectionStatus.Identifying;
+            Status = ConnectionStatus.Verifying;
         }
 
         /// <summary>

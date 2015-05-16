@@ -1,4 +1,5 @@
-﻿using Library.Networking;
+﻿using Library.Logging;
+using Library.Networking;
 using System;
 using System.Collections.Specialized;
 using System.Net;
@@ -63,6 +64,7 @@ namespace DatabaseV2
         /// <param name="port">The port to enable the web interface on.</param>
         public void Enable(int port)
         {
+            Logger.Log("Enabling the web interface on port " + port, LogLevel.Info);
             lock (_listener)
             {
                 try
@@ -73,6 +75,7 @@ namespace DatabaseV2
                 }
                 catch (HttpListenerException)
                 {
+                    Logger.Log("Failed to enable the web interface on anything other than localhost. Please check the permissions the program is running with.", LogLevel.Warning);
                     _listener = new HttpListener();
                     _listener.Prefixes.Add("http://localhost:" + port + "/");
                     _listener.Start();
