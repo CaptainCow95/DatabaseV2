@@ -1,4 +1,5 @@
-﻿using Library;
+﻿using DatabaseV2.Database;
+using Library;
 using Library.Data;
 using Library.Logging;
 using Library.Networking;
@@ -40,6 +41,11 @@ namespace DatabaseV2
         private readonly Random _random = new Random();
 
         /// <summary>
+        /// The node definition of the current node.
+        /// </summary>
+        private readonly NodeDefinition _self;
+
+        /// <summary>
         /// The settings of the database.
         /// </summary>
         private readonly Settings _settings;
@@ -53,6 +59,11 @@ namespace DatabaseV2
         /// The current election term.
         /// </summary>
         private long _currentTerm;
+
+        /// <summary>
+        /// The controller's database lookup table.
+        /// </summary>
+        private DatabaseLookup _databaseLookupTable;
 
         /// <summary>
         /// A value indicating whether the object has already been _disposed.
@@ -87,6 +98,8 @@ namespace DatabaseV2
         {
             Logger.Log("Starting up as a controller node.", LogLevel.Info);
             _settings = settings;
+            _self = new NodeDefinition("localhost", _settings.Port);
+            _databaseLookupTable = new DatabaseLookup(_self);
 
             Logger.Init(_settings.LogLocation, _settings.LogLevel);
             _network = new Network(_settings.Port);
@@ -99,7 +112,7 @@ namespace DatabaseV2
                 _webInterface.Enable(_settings.Port + 1);
             }
 
-            foreach (var n in _settings.Nodes.Except(new[] { new NodeDefinition("localhost", _settings.Port) }))
+            foreach (var n in _settings.Nodes.Except(new[] { _self }))
             {
                 _network.Connect(n);
             }
@@ -165,6 +178,7 @@ namespace DatabaseV2
                     _network.Dispose();
                     _webInterface.Dispose();
                     _leaderLock.Dispose();
+                    _databaseLookupTable.Dispose();
                     _disposed = true;
                 }
             }
@@ -187,7 +201,7 @@ namespace DatabaseV2
                 { "CurrentTerm", term }
             };
             List<Message> messages = new List<Message>();
-            foreach (var n in _settings.Nodes.Except(new[] { new NodeDefinition("localhost", _settings.Port) }))
+            foreach (var n in _settings.Nodes.Except(new[] { _self }))
             {
                 Message m = new Message(n, "InitiateLeaderVote", initiateVoteData, true);
                 _network.SendMessage(m);
@@ -230,10 +244,10 @@ namespace DatabaseV2
             if (term == _currentTerm && yesVotes >= (_settings.Nodes.Count / 2) + 1)
             {
                 _isLeader = true;
-                _leader = new NodeDefinition("localhost", _settings.Port);
+                _leader = _self;
                 Document newLeaderData = new Document
                 {
-                    { "Leader", new NodeDefinition("localhost", _settings.Port).ConnectionName },
+                    { "Leader", _self.ConnectionName },
                     { "CurrentTerm", term }
                 };
                 foreach (var n in _network.GetConnectedNodes())

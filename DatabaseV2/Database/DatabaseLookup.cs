@@ -26,6 +26,15 @@ namespace DatabaseV2.Database
         private bool _disposed = false;
 
         /// <summary>
+        /// Initializes a new instance of the <see cref="DatabaseLookup"/> class.
+        /// </summary>
+        /// <param name="self">The current node.</param>
+        public DatabaseLookup(NodeDefinition self)
+        {
+            _chunks.Add(new ChunkDefinition(new ChunkMarker(ChunkMarkerType.Start), new ChunkMarker(ChunkMarkerType.End), self));
+        }
+
+        /// <summary>
         /// Releases all resources used by the current instance of the <see cref="DatabaseNode"/> class.
         /// </summary>
         public void Dispose()
